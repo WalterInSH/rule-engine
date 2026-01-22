@@ -1,0 +1,15 @@
+.settings
+target
+.classpath
+.project
+/logs/
+bijie-mysql.xml
+pom.xml.versions*
+*.iml
+/.idea/
+rebel.xml
+**/.factorypath
+.DS_Store
+/saml
+**/node_modules/
+**/.next/
