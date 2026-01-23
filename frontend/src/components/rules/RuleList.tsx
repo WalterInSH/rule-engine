@@ -53,26 +53,37 @@ export default function RuleList({ rules, dataModels, onEdit, onDelete, onDragEn
   };
 
   const getActionDescription = (action: string) => {
-    // Parse params.put("key", "value"); or params.put("key", 123);
-    const match = action.match(/params\.put\("([^"]+)",\s*("([^"]+)"|(\d+))\);/);
-    if (match) {
+    // Parse all params.put("key", value);
+    const regex = /params\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+    const actions: string[] = [];
+    
+    let match;
+    while ((match = regex.exec(action)) !== null) {
         const key = match[1];
-        // match[3] is string value without quotes, match[4] is number
-        const value = match[3] || match[4]; 
+        let val = match[2];
         
-        // Find model for this field key (assuming key is field name)
-        // Look in OUTPUT models first, or all models
+        // Remove quotes if it's a string value
+        if (val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1);
+        }
+
+        // Find model for this field key
         const model = dataModels.find(dm => 
             dm.category === DataModelCategory.OUTPUT && 
             dm.fields.some(f => f.name === key)
         );
 
         if (model) {
-            return `${model.name}.${key} = ${value}`;
+            actions.push(`${model.name}.${key} = ${val}`);
+        } else {
+            actions.push(`${key} = ${val}`);
         }
-
-        return `${key} = ${value}`;
     }
+
+    if (actions.length > 0) {
+        return actions.join(', ');
+    }
+    
     return action;
   };
 
