@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SpaceSelector from './SpaceSelector';
+import ThemeSelector from './ThemeSelector';
 
 const Navbar = () => {
   return (
@@ -29,8 +30,9 @@ const Navbar = () => {
             <Link href="/simulator" className="hover:text-blue-400 transition-colors">Simulator</Link>
           </div>
         </div>
-        <div>
+        <div className="flex items-center">
           <SpaceSelector />
+          <ThemeSelector />
         </div>
       </div>
     </nav>
