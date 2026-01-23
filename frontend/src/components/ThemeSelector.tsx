@@ -19,7 +19,7 @@ export default function ThemeSelector() {
   return (
     <div className="relative group inline-block ml-4">
       <button 
-        className="p-2 rounded-md hover:bg-slate-800 text-slate-300 hover:text-white transition-colors focus:outline-none"
+        className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors focus:outline-none"
         aria-label="Toggle theme"
       >
         {theme === 'light' && <Sun className="w-5 h-5" />}
@@ -27,12 +27,12 @@ export default function ThemeSelector() {
         {theme === 'system' && <Monitor className="w-5 h-5" />}
       </button>
 
-      <div className="absolute right-0 mt-2 w-36 bg-slate-800 border border-slate-700 rounded-md shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
-        <div className="py-1">
+      <div className="absolute right-0 top-full pt-2 w-36 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-xl overflow-hidden py-1">
           <button
             onClick={() => setTheme('light')}
-            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-700 transition-colors ${
-              theme === 'light' ? 'text-blue-400' : 'text-slate-300'
+            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+              theme === 'light' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -44,8 +44,8 @@ export default function ThemeSelector() {
 
           <button
             onClick={() => setTheme('dark')}
-            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-700 transition-colors ${
-              theme === 'dark' ? 'text-blue-400' : 'text-slate-300'
+            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+              theme === 'dark' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
             }`}
           >
             <div className="flex items-center gap-2">
@@ -57,8 +57,8 @@ export default function ThemeSelector() {
 
           <button
             onClick={() => setTheme('system')}
-            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-700 transition-colors ${
-              theme === 'system' ? 'text-blue-400' : 'text-slate-300'
+            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+              theme === 'system' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
             }`}
           >
             <div className="flex items-center gap-2">
