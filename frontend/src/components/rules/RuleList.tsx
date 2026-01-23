@@ -1,14 +1,16 @@
 import { Rule, ConditionNode } from '@/types/Rule';
+import { DataModel, DataModelCategory } from '@/types/DataModel';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface RuleListProps {
   rules: Rule[];
+  dataModels: DataModel[];
   onEdit: (rule: Rule) => void;
   onDelete: (id: string) => void;
   onDragEnd: (result: DropResult) => void;
 }
 
-export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleListProps) {
+export default function RuleList({ rules, dataModels, onEdit, onDelete, onDragEnd }: RuleListProps) {
   
   const formatNode = (node?: ConditionNode): string => {
     if (!node) return '';
@@ -50,6 +52,30 @@ export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleLis
       return rule.condition || 'True';
   };
 
+  const getActionDescription = (action: string) => {
+    // Parse params.put("key", "value"); or params.put("key", 123);
+    const match = action.match(/params\.put\("([^"]+)",\s*("([^"]+)"|(\d+))\);/);
+    if (match) {
+        const key = match[1];
+        // match[3] is string value without quotes, match[4] is number
+        const value = match[3] || match[4]; 
+        
+        // Find model for this field key (assuming key is field name)
+        // Look in OUTPUT models first, or all models
+        const model = dataModels.find(dm => 
+            dm.category === DataModelCategory.OUTPUT && 
+            dm.fields.some(f => f.name === key)
+        );
+
+        if (model) {
+            return `${model.name}.${key} = ${value}`;
+        }
+
+        return `${key} = ${value}`;
+    }
+    return action;
+  };
+
   return (
     <div className="flex-1 border dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 overflow-y-auto max-h-64 mb-6">
       <DragDropContext onDragEnd={onDragEnd}>
@@ -69,7 +95,7 @@ export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleLis
                       <div>
                           <div className="font-bold text-slate-800 dark:text-slate-100">ID: {rule.id} <span className="text-slate-400 font-normal">| Priority: {rule.priority}</span></div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">IF {getRuleDescription(rule)}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">THEN {rule.action}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">THEN {getActionDescription(rule.action)}</div>
                       </div>
                       <div className="flex gap-2">
                           <button onClick={() => onEdit(rule)} className="text-blue-500 hover:text-blue-700 text-sm">Edit</button>

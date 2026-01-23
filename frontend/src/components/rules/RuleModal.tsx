@@ -14,6 +14,11 @@ interface RuleModalProps {
 export default function RuleModal({ isOpen, initialRule, dataModels, onClose, onSave }: RuleModalProps) {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
 
+  // Local state for Action Builder
+  const [selectedOutputModel, setSelectedOutputModel] = useState('');
+  const [selectedOutputField, setSelectedOutputField] = useState('');
+  const [outputValue, setOutputValue] = useState('');
+
   useEffect(() => {
     if (initialRule) {
       // Initialize with existing conditionNode or create a default root group
@@ -27,20 +32,47 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
           ...initialRule, 
           conditionNode: initialRule.conditionNode || defaultRoot 
       });
+
+      // Try to parse existing action to pre-fill builder if simple
+      // Matches: params.put("key", "value"); or params.put("key", 123);
+      // Regex is a best-effort parser
+      const match = initialRule.action.match(/params\.put\("([^"]+)",\s*("([^"]+)"|(\d+))\);/);
+      if (match) {
+        // This is tricky because we don't know the Model from just the key if key is just "field"
+        // But if the user follows the new UI, we can try to reverse engineer if needed.
+        // For now, let's just leave the builder empty or handle simple "result" keys if common.
+        // We will just let the user see the generated action string.
+      }
+
     } else {
         setEditingRule(null);
     }
   }, [initialRule, isOpen]);
 
-  if (!isOpen || !editingRule) return null;
+  // Update the action string whenever builder state changes
+  useEffect(() => {
+      if (selectedOutputModel && selectedOutputField && outputValue && editingRule) {
+          // Find field type
+          const model = dataModels.find(m => m.name === selectedOutputModel);
+          const field = model?.fields.find(f => f.name === selectedOutputField);
+          
+          if (field) {
+              let valStr = outputValue;
+              if (field.type === FieldType.STRING) {
+                  valStr = `"${outputValue}"`;
+              }
+              // Generate: params.put("Field", "Value");
+              // Note: We use just the field name as key, assuming the engine puts all outputs in a flat map or similar.
+              // If the engine needs Model.Field, we should change this. Based on previous code: params.put("risk", "high")
+              const actionStr = `params.put("${selectedOutputField}", ${valStr});`;
+              
+              setEditingRule(prev => prev ? ({ ...prev, action: actionStr }) : null);
+          }
+      }
+  }, [selectedOutputModel, selectedOutputField, outputValue, dataModels]);
 
-  const insertFieldSnippet = (fieldStr: string, target: 'condition' | 'action') => {
-    if (!editingRule) return;
-    setEditingRule({
-        ...editingRule,
-        [target]: editingRule[target] + fieldStr
-    });
-  };
+
+  if (!isOpen || !editingRule) return null;
 
   const generateJavaCondition = (node: ConditionNode): string => {
     if (!node) return 'true';
@@ -91,6 +123,8 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
       const ruleToSave = { ...editingRule, condition: generatedCondition };
       onSave(ruleToSave);
   };
+  
+  const outputModels = dataModels.filter(dm => dm.category === DataModelCategory.OUTPUT);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -130,13 +164,51 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
             </div>
 
             <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Action (Java Statement)</label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">e.g., params.put("risk", "high");</p>
-                <div className="flex gap-2 mb-2">
-                     <button onClick={() => insertFieldSnippet('params.put("key", "value");', 'action')} className="text-xs border dark:border-slate-700 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-200">Put Value</button>
-                     <button onClick={() => insertFieldSnippet('params.put("result", "REJECT");', 'action')} className="text-xs border dark:border-slate-700 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-200">Reject</button>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Action (Set Output)</label>
+                <div className="p-4 border dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800">
+                    <div className="flex gap-4 items-end flex-wrap">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Output Model</label>
+                            <select 
+                                value={selectedOutputModel} 
+                                onChange={e => { setSelectedOutputModel(e.target.value); setSelectedOutputField(''); }}
+                                className="border dark:border-slate-600 rounded p-2 text-sm dark:bg-slate-900 dark:text-slate-100 min-w-[150px]"
+                            >
+                                <option value="">Select Model...</option>
+                                {outputModels.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+                            </select>
+                        </div>
+
+                        {selectedOutputModel && (
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Field</label>
+                                <select 
+                                    value={selectedOutputField} 
+                                    onChange={e => setSelectedOutputField(e.target.value)}
+                                    className="border dark:border-slate-600 rounded p-2 text-sm dark:bg-slate-900 dark:text-slate-100 min-w-[150px]"
+                                >
+                                    <option value="">Select Field...</option>
+                                    {dataModels.find(m => m.name === selectedOutputModel)?.fields.map(f => (
+                                        <option key={f.name} value={f.name}>{f.name} ({f.type})</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {selectedOutputField && (
+                             <div className="flex-1">
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Value</label>
+                                <input 
+                                    type="text" 
+                                    value={outputValue} 
+                                    onChange={e => setOutputValue(e.target.value)}
+                                    className="w-full border dark:border-slate-600 rounded p-2 text-sm dark:bg-slate-900 dark:text-slate-100" 
+                                    placeholder="Enter value"
+                                />
+                             </div>
+                        )}
+                    </div>
                 </div>
-                <textarea value={editingRule.action} onChange={e => setEditingRule({...editingRule, action: e.target.value})} className="w-full h-24 border dark:border-slate-700 p-2 font-mono text-sm rounded dark:bg-slate-950 dark:text-slate-100" />
             </div>
 
             <div className="flex justify-end gap-3">

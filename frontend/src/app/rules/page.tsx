@@ -241,6 +241,7 @@ export default function RulesPage() {
                 
                 <RuleList 
                     rules={selectedRuleSet.rules} 
+                    dataModels={dataModels}
                     onEdit={handleEditRule} 
                     onDelete={handleDeleteRule} 
                     onDragEnd={handleDragEnd} 
