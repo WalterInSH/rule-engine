@@ -3,6 +3,7 @@ package com.demo.loader;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.demo.common.DataModel;
+import com.demo.common.DataModelSourceType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -16,9 +17,13 @@ public class LocalFileSystemDataLoader implements DataLoader {
 
     @Override
     public boolean supports(DataModel model) {
-        // Current simple logic: If source is present, assume it is a local file path.
-        // In the future, this can be refined (e.g., check for "file://" prefix or a specific type field).
-        return model != null && model.getSource() != null && !model.getSource().isEmpty();
+        // Support explicit LOCAL_FILE or legacy/null (defaulting to local for backward compatibility if needed)
+        // But for clarity, we should check type. If type is null, we can check if it looks like a path?
+        // Let's enforce type or default to LOCAL if null for backward compat.
+        return model != null && 
+               (model.getSourceType() == DataModelSourceType.LOCAL_FILE || model.getSourceType() == null) &&
+               model.getSource() != null && 
+               !model.getSource().isEmpty();
     }
 
     @Override

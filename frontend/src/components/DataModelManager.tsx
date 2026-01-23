@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { DataModel, FieldDefinition, FieldType, DataModelCategory, EnumDefinition } from '@/types/DataModel';
+import { DataModel, FieldDefinition, FieldType, DataModelCategory, DataModelSourceType, EnumDefinition } from '@/types/DataModel';
 
 const API_URL = 'http://localhost:8080/api/datamodels';
 const ENUM_API_URL = 'http://localhost:8080/api/enums';
@@ -51,6 +51,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
       name: '',
       description: '',
       category: category,
+      sourceType: DataModelSourceType.LOCAL_FILE,
       source: '',
       fields: []
     });
@@ -202,15 +203,31 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
                 </div>
 
                 {category === DataModelCategory.INTERNAL && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Source (Local File Path)</label>
-                    <input
-                      type="text"
-                      value={selectedModel.source || ''}
-                      onChange={(e) => setSelectedModel({ ...selectedModel, source: e.target.value })}
-                      className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 dark:bg-slate-950"
-                      placeholder="/path/to/local/file.json"
-                    />
+                  <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Source Type</label>
+                        <select
+                            value={selectedModel.sourceType || DataModelSourceType.LOCAL_FILE}
+                            onChange={(e) => setSelectedModel({ ...selectedModel, sourceType: e.target.value as DataModelSourceType })}
+                            className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                        >
+                            <option value={DataModelSourceType.LOCAL_FILE}>Local File</option>
+                            <option value={DataModelSourceType.REMOTE_API}>Remote REST API</option>
+                        </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                          {selectedModel.sourceType === DataModelSourceType.REMOTE_API ? 'Source URL' : 'Source (Local File Path)'}
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedModel.source || ''}
+                        onChange={(e) => setSelectedModel({ ...selectedModel, source: e.target.value })}
+                        className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 dark:bg-slate-950"
+                        placeholder={selectedModel.sourceType === DataModelSourceType.REMOTE_API ? 'https://api.example.com/data' : '/path/to/local/file.json'}
+                      />
+                    </div>
                   </div>
                 )}
 
