@@ -1,29 +1,40 @@
 import { Rule, ConditionNode } from '@/types/Rule';
+import { DataModel, DataModelCategory } from '@/types/DataModel';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface RuleListProps {
   rules: Rule[];
+  dataModels: DataModel[];
   onEdit: (rule: Rule) => void;
   onDelete: (id: string) => void;
   onDragEnd: (result: DropResult) => void;
 }
 
-export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleListProps) {
+export default function RuleList({ rules, dataModels, onEdit, onDelete, onDragEnd }: RuleListProps) {
   
   const formatNode = (node?: ConditionNode): string => {
     if (!node) return '';
 
     if (node.type === 'LEAF' && node.condition) {
         const c = node.condition;
-        const fieldName = c.field.split('.')[1] || c.field;
+        // Parse "Model.Field:Type" or "Model.Field"
+        const parts = c.field.split('.');
+        let displayName = c.field;
+        
+        if (parts.length > 1) {
+            const model = parts[0];
+            const field = parts[1].split(':')[0];
+            displayName = `${model}.${field}`;
+        }
+
         let op = c.operator;
         if (op === 'EQUALS') op = '=';
         if (op === 'GT') op = '>';
         if (op === 'LT') op = '<';
-        if (op === 'IS_BLANK') return `${fieldName} is blank`;
-        if (op === 'IS_NOT_BLANK') return `${fieldName} is not blank`;
+        if (op === 'IS_BLANK') return `${displayName} is blank`;
+        if (op === 'IS_NOT_BLANK') return `${displayName} is not blank`;
         
-        return `${fieldName} ${op} ${c.value}`;
+        return `${displayName} ${op} ${c.value}`;
     }
 
     if (node.type === 'GROUP' && node.children && node.children.length > 0) {
@@ -39,6 +50,41 @@ export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleLis
           return formatNode(rule.conditionNode);
       }
       return rule.condition || 'True';
+  };
+
+  const getActionDescription = (action: string) => {
+    // Parse all params.put("key", value);
+    const regex = /params\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+    const actions: string[] = [];
+    
+    let match;
+    while ((match = regex.exec(action)) !== null) {
+        const key = match[1];
+        let val = match[2];
+        
+        // Remove quotes if it's a string value
+        if (val.startsWith('"') && val.endsWith('"')) {
+            val = val.slice(1, -1);
+        }
+
+        // Find model for this field key
+        const model = dataModels.find(dm => 
+            dm.category === DataModelCategory.OUTPUT && 
+            dm.fields.some(f => f.name === key)
+        );
+
+        if (model) {
+            actions.push(`${model.name}.${key} = ${val}`);
+        } else {
+            actions.push(`${key} = ${val}`);
+        }
+    }
+
+    if (actions.length > 0) {
+        return actions.join(', ');
+    }
+    
+    return action;
   };
 
   return (
@@ -60,7 +106,7 @@ export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleLis
                       <div>
                           <div className="font-bold text-slate-800 dark:text-slate-100">ID: {rule.id} <span className="text-slate-400 font-normal">| Priority: {rule.priority}</span></div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-1">IF {getRuleDescription(rule)}</div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">THEN {rule.action}</div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">THEN {getActionDescription(rule.action)}</div>
                       </div>
                       <div className="flex gap-2">
                           <button onClick={() => onEdit(rule)} className="text-blue-500 hover:text-blue-700 text-sm">Edit</button>

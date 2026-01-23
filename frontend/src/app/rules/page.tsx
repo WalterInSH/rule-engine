@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { RuleSet } from '@/types/RuleSet';
 import { Rule, RuleActionType, RuleRunType } from '@/types/Rule';
-import { DataModel } from '@/types/DataModel';
+import { DataModel, EnumDefinition } from '@/types/DataModel';
 import { DropResult } from '@hello-pangea/dnd';
 
 import RuleSetList from '@/components/rules/RuleSetList';
@@ -14,10 +14,12 @@ import Simulator from '@/components/rules/Simulator';
 const RULESETS_API = 'http://localhost:8080/api/rulesets';
 const RULES_EXEC_API = 'http://localhost:8080/api/rules';
 const DATAMODELS_API = 'http://localhost:8080/api/datamodels';
+const ENUMS_API = 'http://localhost:8080/api/enums';
 
 export default function RulesPage() {
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
   const [dataModels, setDataModels] = useState<DataModel[]>([]);
+  const [enums, setEnums] = useState<EnumDefinition[]>([]);
   const [selectedRuleSet, setSelectedRuleSet] = useState<RuleSet | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   
@@ -32,6 +34,7 @@ export default function RulesPage() {
   useEffect(() => {
     fetchRuleSets();
     fetchDataModels();
+    fetchEnums();
   }, []);
 
   const fetchRuleSets = async () => {
@@ -49,6 +52,15 @@ export default function RulesPage() {
       if (res.ok) setDataModels(await res.json());
     } catch (e) {
       console.error('Failed to fetch data models', e);
+    }
+  };
+
+  const fetchEnums = async () => {
+    try {
+      const res = await fetch(ENUMS_API);
+      if (res.ok) setEnums(await res.json());
+    } catch (e) {
+      console.error('Failed to fetch enums', e);
     }
   };
 
@@ -241,6 +253,7 @@ export default function RulesPage() {
                 
                 <RuleList 
                     rules={selectedRuleSet.rules} 
+                    dataModels={dataModels}
                     onEdit={handleEditRule} 
                     onDelete={handleDeleteRule} 
                     onDragEnd={handleDragEnd} 
@@ -267,6 +280,7 @@ export default function RulesPage() {
         isOpen={isRuleModalOpen}
         initialRule={editingRule}
         dataModels={dataModels}
+        enums={enums}
         onClose={() => setIsRuleModalOpen(false)}
         onSave={handleSaveRule}
       />

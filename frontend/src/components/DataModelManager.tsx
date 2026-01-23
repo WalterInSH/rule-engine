@@ -1,35 +1,56 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { DataModel, FieldDefinition, FieldType } from '@/types/DataModel';
+import { useState, useEffect, useCallback } from 'react';
+import { DataModel, FieldDefinition, FieldType, DataModelCategory, EnumDefinition } from '@/types/DataModel';
 
 const API_URL = 'http://localhost:8080/api/datamodels';
+const ENUM_API_URL = 'http://localhost:8080/api/enums';
 
-export default function DataModelsPage() {
+interface DataModelManagerProps {
+  category: DataModelCategory;
+}
+
+export default function DataModelManager({ category }: DataModelManagerProps) {
   const [dataModels, setDataModels] = useState<DataModel[]>([]);
+  const [enums, setEnums] = useState<EnumDefinition[]>([]);
   const [selectedModel, setSelectedModel] = useState<DataModel | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    fetchDataModels();
-  }, []);
-
-  const fetchDataModels = async () => {
+  const fetchDataModels = useCallback(async () => {
     try {
       const res = await fetch(API_URL);
       if (res.ok) {
-        const data = await res.json();
-        setDataModels(data);
+        const data: DataModel[] = await res.json();
+        // Filter models by category
+        setDataModels(data.filter(model => model.category === category));
       }
     } catch (error) {
       console.error('Failed to fetch data models', error);
     }
-  };
+  }, [category]);
+
+  const fetchEnums = useCallback(async () => {
+    try {
+      const res = await fetch(ENUM_API_URL);
+      if (res.ok) {
+        const data: EnumDefinition[] = await res.json();
+        setEnums(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch enums', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDataModels();
+    fetchEnums();
+  }, [fetchDataModels, fetchEnums]);
 
   const handleCreateModel = () => {
     setSelectedModel({
       name: '',
       description: '',
+      category: category,
       fields: []
     });
     setIsEditing(true);
@@ -65,7 +86,7 @@ export default function DataModelsPage() {
       if (res.ok) {
         fetchDataModels();
         setIsEditing(false);
-        setSelectedModel(null); // Optional: clear selection or keep it
+        setSelectedModel(null);
       }
     } catch (error) {
       console.error('Failed to save model', error);
@@ -85,6 +106,12 @@ export default function DataModelsPage() {
     if (!selectedModel) return;
     const newFields = [...selectedModel.fields];
     newFields[index] = { ...newFields[index], [key]: value };
+    
+    // If type changes to something other than ENUM, clear enumName
+    if (key === 'type' && value !== FieldType.ENUM) {
+       delete newFields[index].enumName;
+    }
+
     setSelectedModel({ ...selectedModel, fields: newFields });
   };
 
@@ -97,7 +124,7 @@ export default function DataModelsPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Data Models</h1>
+        <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">{category} Data Models</h1>
         <button
           onClick={handleCreateModel}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded"
@@ -120,7 +147,9 @@ export default function DataModelsPage() {
                 onClick={() => handleEditModel(model)}
               >
                 <div>
-                  <div className="font-medium text-slate-900 dark:text-slate-100">{model.name}</div>
+                  <div className="font-medium text-slate-900 dark:text-slate-100">
+                    {model.name}
+                  </div>
                   <div className="text-sm text-slate-500 dark:text-slate-400 truncate w-32">{model.description}</div>
                 </div>
                 <button
@@ -132,7 +161,7 @@ export default function DataModelsPage() {
               </li>
             ))}
             {dataModels.length === 0 && (
-              <li className="text-slate-400 text-center py-4">No data models found.</li>
+              <li className="text-slate-400 text-center py-4">No {category.toLowerCase()} data models found.</li>
             )}
           </ul>
         </div>
@@ -151,9 +180,13 @@ export default function DataModelsPage() {
                   <input
                     type="text"
                     value={selectedModel.name}
-                    onChange={(e) => setSelectedModel({ ...selectedModel, name: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+                      setSelectedModel({ ...selectedModel, name: val });
+                    }}
                     className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 dark:bg-slate-950"
                     placeholder="e.g., Transaction"
+                    title="Only alphanumeric characters are allowed (a-z, A-Z, 0-9)"
                   />
                 </div>
                 <div>
@@ -200,7 +233,22 @@ export default function DataModelsPage() {
                           <option value={FieldType.STRING}>String</option>
                           <option value={FieldType.NUMBER}>Number</option>
                           <option value={FieldType.BOOLEAN}>Boolean</option>
+                          <option value={FieldType.ENUM}>Enum</option>
                         </select>
+                        
+                        {field.type === FieldType.ENUM && (
+                          <select
+                            value={field.enumName || ''}
+                            onChange={(e) => handleFieldChange(index, 'enumName', e.target.value)}
+                            className="w-40 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
+                          >
+                            <option value="">Select Enum...</option>
+                            {enums.map(e => (
+                              <option key={e.name} value={e.name}>{e.name}</option>
+                            ))}
+                          </select>
+                        )}
+
                         <button
                           onClick={() => handleDeleteField(index)}
                           className="text-red-500 hover:text-red-700 px-2"

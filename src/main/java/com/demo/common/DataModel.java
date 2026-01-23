@@ -7,5 +7,6 @@ import java.util.List;
 public class DataModel {
     private String name;
     private String description;
+    private DataModelCategory category;
     private List<FieldDefinition> fields;
 }

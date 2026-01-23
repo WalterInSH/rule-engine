@@ -1,18 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Rule, RuleActionType, RuleRunType, ConditionNode, ConditionDefinition } from '@/types/Rule';
-import { DataModel, FieldType } from '@/types/DataModel';
+import { Rule, RuleActionType, ConditionNode } from '@/types/Rule';
+import { DataModel, FieldType, DataModelCategory, EnumDefinition } from '@/types/DataModel';
 import ConditionTree from './ConditionTree';
 
 interface RuleModalProps {
   isOpen: boolean;
   initialRule: Rule | null;
   dataModels: DataModel[];
+  enums: EnumDefinition[];
   onClose: () => void;
   onSave: (rule: Rule) => void;
 }
 
-export default function RuleModal({ isOpen, initialRule, dataModels, onClose, onSave }: RuleModalProps) {
+interface ActionItem {
+  id: string;
+  modelName: string;
+  fieldName: string;
+  value: string;
+  isString?: boolean; // Track if the original value was quoted
+}
+
+export default function RuleModal({ isOpen, initialRule, dataModels, enums, onClose, onSave }: RuleModalProps) {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
 
   useEffect(() => {
     if (initialRule) {
@@ -27,20 +37,94 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
           ...initialRule, 
           conditionNode: initialRule.conditionNode || defaultRoot 
       });
+
+      // Parse existing action string into ActionItems
+      const items: ActionItem[] = [];
+      if (initialRule.action) {
+        // Regex to match params.put("key", value);
+        // Supports string values ("val"), numbers (123, 12.3), and booleans (true, false)
+        const regex = /params\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+        let match;
+        while ((match = regex.exec(initialRule.action)) !== null) {
+            const fieldKey = match[1];
+            let val = match[2];
+            let isString = false;
+            
+            // Remove quotes if it's a string value
+            if (val.startsWith('"') && val.endsWith('"')) {
+                val = val.slice(1, -1);
+                isString = true;
+            }
+
+            // Try to find the model for this field
+            const model = dataModels.find(m => m.category === DataModelCategory.OUTPUT && m.fields.some(f => f.name === fieldKey));
+            
+            items.push({
+                id: crypto.randomUUID(),
+                modelName: model ? model.name : '',
+                fieldName: fieldKey,
+                value: val,
+                isString
+            });
+        }
+      }
+      
+      if (items.length === 0) {
+          items.push({ id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', isString: true });
+      }
+      
+      setActionItems(items);
+
     } else {
         setEditingRule(null);
+        setActionItems([]);
     }
-  }, [initialRule, isOpen]);
+  }, [initialRule, isOpen, dataModels]);
+
+  // Reconstruct action string whenever actionItems changes
+  useEffect(() => {
+      if (!editingRule) return;
+
+      const actions: string[] = [];
+      
+      actionItems.forEach(item => {
+          // Require fieldName and value. We do NOT require modelName to ensure preservation.
+          if (item.fieldName && item.value !== '') {
+             const model = dataModels.find(m => m.name === item.modelName);
+             const field = model?.fields.find(f => f.name === item.fieldName);
+             
+             let valStr = item.value;
+             let shouldQuote = false;
+
+             if (field) {
+                 // If we found the field, strictly follow its type
+                 if (field.type === FieldType.STRING || field.type === FieldType.ENUM) {
+                     shouldQuote = true;
+                 }
+             } else {
+                 // Fallback: use the original parsing hint
+                 if (item.isString) {
+                     shouldQuote = true;
+                 }
+             }
+
+             if (shouldQuote) {
+                 valStr = `"${item.value}"`;
+             }
+
+             actions.push(`params.put("${item.fieldName}", ${valStr});`);
+          }
+      });
+
+      const actionStr = actions.join(' ');
+      
+      if (editingRule.action !== actionStr) {
+          setEditingRule(prev => prev ? ({ ...prev, action: actionStr }) : null);
+      }
+      
+  }, [actionItems, dataModels]); 
 
   if (!isOpen || !editingRule) return null;
-
-  const insertFieldSnippet = (fieldStr: string, target: 'condition' | 'action') => {
-    if (!editingRule) return;
-    setEditingRule({
-        ...editingRule,
-        [target]: editingRule[target] + fieldStr
-    });
-  };
 
   const generateJavaCondition = (node: ConditionNode): string => {
     if (!node) return 'true';
@@ -88,13 +172,49 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
   const handleSave = () => {
       if (!editingRule) return;
       const generatedCondition = generateJavaCondition(editingRule.conditionNode!);
-      const ruleToSave = { ...editingRule, condition: generatedCondition };
+      // Ensure action string is up to date (logic duplicated from effect for safety, though effect should handle it)
+      const actions: string[] = [];
+      actionItems.forEach(item => {
+          if (item.fieldName && item.value !== '') {
+             const model = dataModels.find(m => m.name === item.modelName);
+             const field = model?.fields.find(f => f.name === item.fieldName);
+             let valStr = item.value;
+             let shouldQuote = false;
+             if (field) {
+                 if (field.type === FieldType.STRING || field.type === FieldType.ENUM) shouldQuote = true;
+             } else {
+                 if (item.isString) shouldQuote = true;
+             }
+             if (shouldQuote) valStr = `"${item.value}"`;
+             actions.push(`params.put("${item.fieldName}", ${valStr});`);
+          }
+      });
+      
+      const ruleToSave = { 
+          ...editingRule, 
+          condition: generatedCondition,
+          action: actions.join(' ')
+      };
       onSave(ruleToSave);
+  };
+  
+  const outputModels = dataModels.filter(dm => dm.category === DataModelCategory.OUTPUT);
+
+  const handleAddAction = () => {
+      setActionItems([...actionItems, { id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', isString: true }]);
+  };
+
+  const handleRemoveAction = (id: string) => {
+      setActionItems(actionItems.filter(item => item.id !== id));
+  };
+
+  const updateActionItem = (id: string, updates: Partial<ActionItem>) => {
+      setActionItems(actionItems.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-5xl p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4 dark:text-slate-100">Edit Rule</h2>
             
             <div className="grid grid-cols-4 gap-4 mb-4">
@@ -120,7 +240,7 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
                     {editingRule.conditionNode && (
                         <ConditionTree 
                             node={editingRule.conditionNode} 
-                            dataModels={dataModels}
+                            dataModels={dataModels.filter(dm => dm.category === DataModelCategory.INPUT)}
                             isRoot={true}
                             onChange={(newNode) => setEditingRule({...editingRule, conditionNode: newNode})}
                             onRemove={() => {}} // Root cannot be removed
@@ -130,13 +250,99 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
             </div>
 
             <div className="mb-6">
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Action (Java Statement)</label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">e.g., params.put("risk", "high");</p>
-                <div className="flex gap-2 mb-2">
-                     <button onClick={() => insertFieldSnippet('params.put("key", "value");', 'action')} className="text-xs border dark:border-slate-700 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-200">Put Value</button>
-                     <button onClick={() => insertFieldSnippet('params.put("result", "REJECT");', 'action')} className="text-xs border dark:border-slate-700 px-2 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-200">Reject</button>
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300">Actions (Set Outputs)</label>
+                    <button onClick={handleAddAction} className="text-xs bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-2 py-1 rounded">
+                        + Add Output
+                    </button>
                 </div>
-                <textarea value={editingRule.action} onChange={e => setEditingRule({...editingRule, action: e.target.value})} className="w-full h-24 border dark:border-slate-700 p-2 font-mono text-sm rounded dark:bg-slate-950 dark:text-slate-100" />
+                
+                <div className="border dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 p-2 space-y-2">
+                    {actionItems.map((item, index) => {
+                        // Helper to find current field config for this row
+                        const currentModel = dataModels.find(m => m.name === item.modelName);
+                        const currentField = currentModel?.fields.find(f => f.name === item.fieldName);
+                        const currentEnum = currentField?.type === FieldType.ENUM && currentField.enumName 
+                                          ? enums.find(e => e.name === currentField.enumName) 
+                                          : null;
+
+                        return (
+                            <div key={item.id} className="flex gap-2 items-center bg-white dark:bg-slate-900 p-2 rounded border dark:border-slate-700">
+                                <div className="w-1/4">
+                                    <select 
+                                        value={item.modelName} 
+                                        onChange={e => updateActionItem(item.id, { modelName: e.target.value, fieldName: '', value: '' })}
+                                        className="w-full border dark:border-slate-600 rounded p-1 text-sm dark:bg-slate-950 dark:text-slate-100"
+                                    >
+                                        <option value="">Select Model...</option>
+                                        {outputModels.map(m => <option key={m.name} value={m.name}>{m.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="w-1/4">
+                                    {/* If model selected, show Field Dropdown. If not, show raw input (or disabled dropdown + text display?) */}
+                                    {/* To keep it simple and preserve data, if we can't find the model, we show the fieldName in a simple text input so user sees it exists */}
+                                    {item.modelName ? (
+                                        <select 
+                                            value={item.fieldName} 
+                                            onChange={e => updateActionItem(item.id, { fieldName: e.target.value, value: '' })}
+                                            className="w-full border dark:border-slate-600 rounded p-1 text-sm dark:bg-slate-950 dark:text-slate-100"
+                                        >
+                                            <option value="">Select Field...</option>
+                                            {currentModel?.fields.map(f => (
+                                                <option key={f.name} value={f.name}>{f.name} ({f.type})</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input 
+                                            type="text"
+                                            value={item.fieldName}
+                                            disabled
+                                            className="w-full border dark:border-slate-600 rounded p-1 text-sm dark:bg-slate-950 dark:text-slate-400 bg-slate-100 italic"
+                                            title="Field name (Model not found)"
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="flex-1">
+                                    {currentEnum ? (
+                                      <select
+                                        value={item.value}
+                                        onChange={e => updateActionItem(item.id, { value: e.target.value })}
+                                        className="w-full border dark:border-slate-600 rounded p-1 text-sm dark:bg-slate-950 dark:text-slate-100"
+                                      >
+                                        <option value="">Select {currentEnum.name}...</option>
+                                        {currentEnum.values.map(v => (
+                                          <option key={v} value={v}>{v}</option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input 
+                                          type="text" 
+                                          value={item.value} 
+                                          onChange={e => updateActionItem(item.id, { value: e.target.value })}
+                                          disabled={!!item.modelName && !item.fieldName} // Disabled if model selected but field not
+                                          className="w-full border dark:border-slate-600 rounded p-1 text-sm dark:bg-slate-950 dark:text-slate-100" 
+                                          placeholder="Value"
+                                      />
+                                    )}
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleRemoveAction(item.id)}
+                                    className="text-red-500 hover:text-red-700 px-2"
+                                    title="Remove Action"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        );
+                    })}
+                    
+                    {actionItems.length === 0 && (
+                        <p className="text-center text-slate-400 text-sm py-2">No actions defined.</p>
+                    )}
+                </div>
             </div>
 
             <div className="flex justify-end gap-3">
