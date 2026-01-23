@@ -19,6 +19,7 @@ const Navbar = () => {
             <div className="absolute left-0 mt-2 w-48 bg-slate-800 rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
               <Link href="/datamodels/input" className="block px-4 py-2 hover:bg-slate-700 hover:text-blue-400 transition-colors first:rounded-t-md">Input Models</Link>
               <Link href="/datamodels/output" className="block px-4 py-2 hover:bg-slate-700 hover:text-blue-400 transition-colors">Output Models</Link>
+              <Link href="/datamodels/internal" className="block px-4 py-2 hover:bg-slate-700 hover:text-blue-400 transition-colors">Internal Models</Link>
               <Link href="/datamodels/enums" className="block px-4 py-2 hover:bg-slate-700 hover:text-blue-400 transition-colors last:rounded-b-md">Enums</Link>
             </div>
           </div>

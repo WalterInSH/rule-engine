@@ -8,6 +8,7 @@ export enum FieldType {
 export enum DataModelCategory {
   INPUT = 'INPUT',
   OUTPUT = 'OUTPUT',
+  INTERNAL = 'INTERNAL',
 }
 
 export interface FieldDefinition {
@@ -20,6 +21,7 @@ export interface DataModel {
   name: string;
   description: string;
   category?: DataModelCategory;
+  source?: string;
   fields: FieldDefinition[];
 }
 

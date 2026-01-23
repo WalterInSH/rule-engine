@@ -51,6 +51,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
       name: '',
       description: '',
       category: category,
+      source: '',
       fields: []
     });
     setIsEditing(true);
@@ -199,6 +200,19 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
                     placeholder="Description of this model"
                   />
                 </div>
+
+                {category === DataModelCategory.INTERNAL && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Source (Local File Path)</label>
+                    <input
+                      type="text"
+                      value={selectedModel.source || ''}
+                      onChange={(e) => setSelectedModel({ ...selectedModel, source: e.target.value })}
+                      className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-900 dark:text-slate-100 dark:bg-slate-950"
+                      placeholder="/path/to/local/file.json"
+                    />
+                  </div>
+                )}
 
                 <div className="mt-8">
                   <div className="flex justify-between items-center mb-2">

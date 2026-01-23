@@ -8,5 +8,6 @@ public class DataModel {
     private String name;
     private String description;
     private DataModelCategory category;
+    private String source;
     private List<FieldDefinition> fields;
 }
