@@ -20,6 +20,13 @@ import java.util.Scanner;
 @Slf4j
 public class RuleEngine {
     private volatile List<RunTimeRule> activeRules = new ArrayList<>();
+    private volatile List<String> activeInternalModels = new ArrayList<>();
+
+    private final com.demo.service.DataModelService dataModelService;
+
+    public RuleEngine(com.demo.service.DataModelService dataModelService) {
+        this.dataModelService = dataModelService;
+    }
 
     @PostConstruct
     public void init() {
@@ -46,7 +53,15 @@ public class RuleEngine {
     }
 
     public void loadRules(com.demo.common.RuleSet ruleSet) {
-        if (ruleSet == null || ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
+        if (ruleSet == null) {
+            this.activeRules = Collections.emptyList();
+            this.activeInternalModels = Collections.emptyList();
+            return;
+        }
+
+        this.activeInternalModels = ruleSet.getInternalModels() != null ? ruleSet.getInternalModels() : new ArrayList<>();
+        
+        if (ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
             this.activeRules = Collections.emptyList();
             return;
         }
@@ -74,10 +89,40 @@ public class RuleEngine {
             }
         }
         this.activeRules = newRules;
-        log.info("Successfully loaded {} rules.", newRules.size());
+        log.info("Successfully loaded {} rules and configured {} internal models.", newRules.size(), activeInternalModels.size());
     }
 
     public void execute(JSONObject params) {
+        // Load data from internal models
+        for (String modelName : activeInternalModels) {
+            try {
+                // Find model definition to get source path
+                // Note: In a real high-perf scenario, we might cache the map of name->path
+                com.demo.common.DataModel model = dataModelService.getAllDataModels().stream()
+                        .filter(m -> m.getName().equals(modelName))
+                        .findFirst()
+                        .orElse(null);
+
+                if (model != null && model.getSource() != null && !model.getSource().isEmpty()) {
+                    java.io.File file = new java.io.File(model.getSource());
+                    if (file.exists() && file.isFile()) {
+                        String content = new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
+                        JSONObject modelData = JSON.parseObject(content);
+                        if (modelData != null) {
+                            params.putAll(modelData);
+                            log.debug("Loaded internal model '{}' data from {}", modelName, model.getSource());
+                        }
+                    } else {
+                        log.warn("Internal model '{}' source file not found: {}", modelName, model.getSource());
+                    }
+                } else {
+                    log.warn("Internal model '{}' not found or has no source configured.", modelName);
+                }
+            } catch (Exception e) {
+                log.error("Failed to load internal model: " + modelName, e);
+            }
+        }
+
         ExecutePolicy policy = new ExecutePolicy(activeRules);
         policy.execute(params);
     }

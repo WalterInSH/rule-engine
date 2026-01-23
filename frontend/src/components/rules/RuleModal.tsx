@@ -7,6 +7,7 @@ interface RuleModalProps {
   isOpen: boolean;
   initialRule: Rule | null;
   dataModels: DataModel[];
+  enabledInternalModels: string[];
   enums: EnumDefinition[];
   onClose: () => void;
   onSave: (rule: Rule) => void;
@@ -20,7 +21,7 @@ interface ActionItem {
   isString?: boolean; // Track if the original value was quoted
 }
 
-export default function RuleModal({ isOpen, initialRule, dataModels, enums, onClose, onSave }: RuleModalProps) {
+export default function RuleModal({ isOpen, initialRule, dataModels, enabledInternalModels, enums, onClose, onSave }: RuleModalProps) {
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [actionItems, setActionItems] = useState<ActionItem[]>([]);
 
@@ -240,7 +241,10 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enums, onCl
                     {editingRule.conditionNode && (
                         <ConditionTree 
                             node={editingRule.conditionNode} 
-                            dataModels={dataModels.filter(dm => dm.category === DataModelCategory.INPUT)}
+                            dataModels={[
+                                ...dataModels.filter(dm => dm.category === DataModelCategory.INPUT),
+                                ...dataModels.filter(dm => dm.category === DataModelCategory.INTERNAL && enabledInternalModels.includes(dm.name))
+                            ]}
                             isRoot={true}
                             onChange={(newNode) => setEditingRule({...editingRule, conditionNode: newNode})}
                             onRemove={() => {}} // Root cannot be removed

@@ -1,9 +1,11 @@
 'use client';
 
+'use client';
+
 import { useState, useEffect } from 'react';
 import { RuleSet } from '@/types/RuleSet';
 import { Rule, RuleActionType, RuleRunType } from '@/types/Rule';
-import { DataModel, EnumDefinition } from '@/types/DataModel';
+import { DataModel, EnumDefinition, DataModelCategory } from '@/types/DataModel';
 import { DropResult } from '@hello-pangea/dnd';
 
 import RuleSetList from '@/components/rules/RuleSetList';
@@ -66,12 +68,12 @@ export default function RulesPage() {
 
   // Rule Set CRUD
   const handleCreateRuleSet = () => {
-    setSelectedRuleSet({ name: '', description: '', runType: RuleRunType.SYNC, rules: [] });
+    setSelectedRuleSet({ name: '', description: '', runType: RuleRunType.SYNC, internalModels: [], rules: [] });
     setIsEditing(true);
   };
 
   const handleEditRuleSet = (rs: RuleSet) => {
-    setSelectedRuleSet({ ...rs, runType: rs.runType || RuleRunType.SYNC });
+    setSelectedRuleSet({ ...rs, runType: rs.runType || RuleRunType.SYNC, internalModels: rs.internalModels || [] });
     setIsEditing(true);
   };
 
@@ -242,6 +244,34 @@ export default function RulesPage() {
                     </select>
                 </div>
               </div>
+              
+              {/* Internal Models Selection */}
+              <div className="mb-6">
+                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Enabled Internal Models (Pre-load Data)</label>
+                 <div className="border border-slate-200 dark:border-slate-700 rounded p-3 bg-slate-50 dark:bg-slate-950 grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {dataModels.filter(dm => dm.category === DataModelCategory.INTERNAL).map(model => (
+                        <label key={model.name} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-100 dark:hover:bg-slate-900 rounded">
+                            <input 
+                                type="checkbox" 
+                                checked={selectedRuleSet.internalModels?.includes(model.name) || false}
+                                onChange={(e) => {
+                                    const current = selectedRuleSet.internalModels || [];
+                                    if (e.target.checked) {
+                                        setSelectedRuleSet({ ...selectedRuleSet, internalModels: [...current, model.name] });
+                                    } else {
+                                        setSelectedRuleSet({ ...selectedRuleSet, internalModels: current.filter(n => n !== model.name) });
+                                    }
+                                }}
+                                className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-slate-700 dark:text-slate-300 truncate" title={model.name}>{model.name}</span>
+                        </label>
+                    ))}
+                    {dataModels.filter(dm => dm.category === DataModelCategory.INTERNAL).length === 0 && (
+                        <p className="text-sm text-slate-400 italic">No internal models defined.</p>
+                    )}
+                 </div>
+              </div>
 
               <div className="flex-1 flex flex-col">
                 <div className="flex justify-between items-center mb-2">
@@ -280,6 +310,7 @@ export default function RulesPage() {
         isOpen={isRuleModalOpen}
         initialRule={editingRule}
         dataModels={dataModels}
+        enabledInternalModels={selectedRuleSet?.internalModels || []}
         enums={enums}
         onClose={() => setIsRuleModalOpen(false)}
         onSave={handleSaveRule}
