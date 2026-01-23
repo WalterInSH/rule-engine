@@ -13,6 +13,7 @@ interface ConditionTreeProps {
 export default function ConditionTree({ node, dataModels, onChange, onRemove, isRoot = false }: ConditionTreeProps) {
   
   // Local state for the "Add Leaf" form within a group
+  const [selectedModel, setSelectedModel] = useState('');
   const [addField, setAddField] = useState('');
   const [addOperator, setAddOperator] = useState('');
   const [addValue, setAddValue] = useState('');
@@ -127,18 +128,36 @@ export default function ConditionTree({ node, dataModels, onChange, onRemove, is
       {/* Add New Item Form */}
       <div className="mt-3 pt-3 border-t dark:border-slate-600">
         <div className="flex gap-2 items-center flex-wrap">
-            <select 
-                value={addField} 
-                onChange={e => { setAddField(e.target.value); setAddOperator(''); }}
+            <select
+                value={selectedModel}
+                onChange={e => {
+                    setSelectedModel(e.target.value);
+                    setAddField('');
+                    setAddOperator('');
+                    setAddValue('');
+                }}
                 className="text-xs border dark:border-slate-600 rounded p-1 dark:bg-slate-800 dark:text-slate-200 max-w-[150px]"
             >
-                <option value="">+ Add Condition...</option>
-                {dataModels.flatMap(dm => dm.fields.map(f => (
-                    <option key={`${dm.name}-${f.name}`} value={`${dm.name}.${f.name}:${f.type}`}>
-                        {dm.name}.{f.name}
-                    </option>
-                )))}
+                <option value="">+ Add Condition (Model)...</option>
+                {dataModels.map(dm => (
+                    <option key={dm.name} value={dm.name}>{dm.name}</option>
+                ))}
             </select>
+
+            {selectedModel && (
+                <select 
+                    value={addField} 
+                    onChange={e => { setAddField(e.target.value); setAddOperator(''); }}
+                    className="text-xs border dark:border-slate-600 rounded p-1 dark:bg-slate-800 dark:text-slate-200 max-w-[150px]"
+                >
+                    <option value="">Select Field...</option>
+                    {dataModels.find(dm => dm.name === selectedModel)?.fields.map(f => (
+                        <option key={`${selectedModel}-${f.name}`} value={`${selectedModel}.${f.name}:${f.type}`}>
+                            {f.name}
+                        </option>
+                    ))}
+                </select>
+            )}
             
             {addField && (
                 <>

@@ -15,15 +15,24 @@ export default function RuleList({ rules, onEdit, onDelete, onDragEnd }: RuleLis
 
     if (node.type === 'LEAF' && node.condition) {
         const c = node.condition;
-        const fieldName = c.field.split('.')[1] || c.field;
+        // Parse "Model.Field:Type" or "Model.Field"
+        const parts = c.field.split('.');
+        let displayName = c.field;
+        
+        if (parts.length > 1) {
+            const model = parts[0];
+            const field = parts[1].split(':')[0];
+            displayName = `${model}.${field}`;
+        }
+
         let op = c.operator;
         if (op === 'EQUALS') op = '=';
         if (op === 'GT') op = '>';
         if (op === 'LT') op = '<';
-        if (op === 'IS_BLANK') return `${fieldName} is blank`;
-        if (op === 'IS_NOT_BLANK') return `${fieldName} is not blank`;
+        if (op === 'IS_BLANK') return `${displayName} is blank`;
+        if (op === 'IS_NOT_BLANK') return `${displayName} is not blank`;
         
-        return `${fieldName} ${op} ${c.value}`;
+        return `${displayName} ${op} ${c.value}`;
     }
 
     if (node.type === 'GROUP' && node.children && node.children.length > 0) {

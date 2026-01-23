@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Rule, RuleActionType, RuleRunType, ConditionNode, ConditionDefinition } from '@/types/Rule';
-import { DataModel, FieldType } from '@/types/DataModel';
+import { DataModel, FieldType, DataModelCategory } from '@/types/DataModel';
 import ConditionTree from './ConditionTree';
 
 interface RuleModalProps {
@@ -120,7 +120,7 @@ export default function RuleModal({ isOpen, initialRule, dataModels, onClose, on
                     {editingRule.conditionNode && (
                         <ConditionTree 
                             node={editingRule.conditionNode} 
-                            dataModels={dataModels}
+                            dataModels={dataModels.filter(dm => dm.category === DataModelCategory.INPUT)}
                             isRoot={true}
                             onChange={(newNode) => setEditingRule({...editingRule, conditionNode: newNode})}
                             onRemove={() => {}} // Root cannot be removed
