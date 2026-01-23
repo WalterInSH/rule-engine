@@ -20,6 +20,15 @@ import java.util.Scanner;
 @Slf4j
 public class RuleEngine {
     private volatile List<RunTimeRule> activeRules = new ArrayList<>();
+    private volatile List<String> activeInternalModels = new ArrayList<>();
+
+    private final com.demo.service.DataModelService dataModelService;
+    private final List<com.demo.loader.DataLoader> dataLoaders;
+
+    public RuleEngine(com.demo.service.DataModelService dataModelService, List<com.demo.loader.DataLoader> dataLoaders) {
+        this.dataModelService = dataModelService;
+        this.dataLoaders = dataLoaders;
+    }
 
     @PostConstruct
     public void init() {
@@ -46,7 +55,15 @@ public class RuleEngine {
     }
 
     public void loadRules(com.demo.common.RuleSet ruleSet) {
-        if (ruleSet == null || ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
+        if (ruleSet == null) {
+            this.activeRules = Collections.emptyList();
+            this.activeInternalModels = Collections.emptyList();
+            return;
+        }
+
+        this.activeInternalModels = ruleSet.getInternalModels() != null ? ruleSet.getInternalModels() : new ArrayList<>();
+        
+        if (ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
             this.activeRules = Collections.emptyList();
             return;
         }
@@ -74,10 +91,41 @@ public class RuleEngine {
             }
         }
         this.activeRules = newRules;
-        log.info("Successfully loaded {} rules.", newRules.size());
+        log.info("Successfully loaded {} rules and configured {} internal models.", newRules.size(), activeInternalModels.size());
     }
 
     public void execute(JSONObject params) {
+        // Load data from internal models
+        for (String modelName : activeInternalModels) {
+            try {
+                com.demo.common.DataModel model = dataModelService.getAllDataModels().stream()
+                        .filter(m -> m.getName().equals(modelName))
+                        .findFirst()
+                        .orElse(null);
+
+                if (model != null) {
+                    boolean loaded = false;
+                    for (com.demo.loader.DataLoader loader : dataLoaders) {
+                        if (loader.supports(model)) {
+                            JSONObject modelData = loader.load(model);
+                            if (modelData != null) {
+                                params.putAll(modelData);
+                                loaded = true;
+                                break; // Stop after first successful loader matches and loads
+                            }
+                        }
+                    }
+                    if (!loaded) {
+                        log.warn("No suitable data loader found or failed to load data for internal model '{}'", modelName);
+                    }
+                } else {
+                    log.warn("Internal model definition not found for '{}'", modelName);
+                }
+            } catch (Exception e) {
+                log.error("Failed to load internal model: " + modelName, e);
+            }
+        }
+
         ExecutePolicy policy = new ExecutePolicy(activeRules);
         policy.execute(params);
     }

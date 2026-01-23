@@ -8,6 +8,12 @@ export enum FieldType {
 export enum DataModelCategory {
   INPUT = 'INPUT',
   OUTPUT = 'OUTPUT',
+  INTERNAL = 'INTERNAL',
+}
+
+export enum DataModelSourceType {
+  LOCAL_FILE = 'LOCAL_FILE',
+  REMOTE_API = 'REMOTE_API',
 }
 
 export interface FieldDefinition {
@@ -20,6 +26,8 @@ export interface DataModel {
   name: string;
   description: string;
   category?: DataModelCategory;
+  sourceType?: DataModelSourceType;
+  source?: string;
   fields: FieldDefinition[];
 }
 
