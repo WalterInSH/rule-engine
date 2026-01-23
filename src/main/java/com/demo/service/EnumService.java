@@ -3,6 +3,7 @@ package com.demo.service;
 import com.alibaba.fastjson.JSON;
 import com.demo.common.EnumDefinition;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -21,7 +22,11 @@ import java.util.stream.Stream;
 @Slf4j
 public class EnumService {
 
-    private final String STORAGE_DIR = System.getProperty("java.io.tmpdir") + File.separator + "simple-rule-engine" + File.separator + "enums";
+    private final String STORAGE_DIR;
+
+    public EnumService(@Value("${app.storage.base-dir}") String baseDir) {
+        this.STORAGE_DIR = Paths.get(baseDir, "enums").toString();
+    }
 
     @PostConstruct
     public void init() {

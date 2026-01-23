@@ -3,6 +3,7 @@ package com.demo.service;
 import com.alibaba.fastjson.JSON;
 import com.demo.common.DataModel;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -22,7 +23,11 @@ import java.util.stream.Stream;
 @Slf4j
 public class DataModelService {
 
-    private final String STORAGE_DIR = System.getProperty("java.io.tmpdir") + File.separator + "simple-rule-engine" + File.separator + "datamodels";
+    private final String STORAGE_DIR;
+
+    public DataModelService(@Value("${app.storage.base-dir}") String baseDir) {
+        this.STORAGE_DIR = Paths.get(baseDir, "datamodels").toString();
+    }
 
     @PostConstruct
     public void init() {

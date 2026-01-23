@@ -1,0 +1,3 @@
+app:
+  storage:
+    base-dir: ${java.io.tmpdir}/simple-rule-engine
