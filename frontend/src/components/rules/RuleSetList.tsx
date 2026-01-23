@@ -74,6 +74,11 @@ export default function RuleSetList({ ruleSets, selectedRuleSet, onSelect, onDel
                         <h3 className={`font-semibold truncate ${isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-200'}`}>
                           {rs.name}
                         </h3>
+                        {rs.runType === RuleRunType.ASYNC ? (
+                            <Clock size={12} className="text-amber-500" title="Async" />
+                        ) : (
+                            <Zap size={12} className="text-green-500" title="Sync" />
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
                         {rs.description || <span className="italic opacity-50">No description</span>}
