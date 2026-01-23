@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { EnumDefinition } from '@/types/DataModel';
-
-const API_URL = 'http://localhost:8080/api/enums';
+import { getSpaceApiUrl } from '@/utils/apiConfig';
 
 export default function EnumManager() {
   const [enums, setEnums] = useState<EnumDefinition[]>([]);
@@ -12,7 +11,7 @@ export default function EnumManager() {
 
   const fetchEnums = useCallback(async () => {
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(getSpaceApiUrl('enums'));
       if (res.ok) {
         const data: EnumDefinition[] = await res.json();
         setEnums(data);
@@ -24,6 +23,15 @@ export default function EnumManager() {
 
   useEffect(() => {
     fetchEnums();
+
+    const handleSpaceChange = () => {
+        fetchEnums();
+    };
+
+    window.addEventListener('spaceChanged', handleSpaceChange);
+    return () => {
+        window.removeEventListener('spaceChanged', handleSpaceChange);
+    };
   }, [fetchEnums]);
 
   const handleCreateEnum = () => {
@@ -43,7 +51,7 @@ export default function EnumManager() {
   const handleDeleteEnum = async (name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
-      await fetch(`${API_URL}/${name}`, { method: 'DELETE' });
+      await fetch(`${getSpaceApiUrl('enums')}/${name}`, { method: 'DELETE' });
       fetchEnums();
       if (selectedEnum?.name === name) {
         setSelectedEnum(null);
@@ -57,7 +65,7 @@ export default function EnumManager() {
   const handleSaveEnum = async () => {
     if (!selectedEnum || !selectedEnum.name) return;
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(getSpaceApiUrl('enums'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedEnum),

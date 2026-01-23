@@ -23,26 +23,51 @@ import java.util.stream.Stream;
 @Slf4j
 public class DataModelService {
 
-    private final String STORAGE_DIR;
+    private final String BASE_DIR;
 
     public DataModelService(@Value("${app.storage.base-dir}") String baseDir) {
-        this.STORAGE_DIR = Paths.get(baseDir, "datamodels").toString();
+        this.BASE_DIR = baseDir;
     }
 
     @PostConstruct
     public void init() {
-        File dir = new File(STORAGE_DIR);
-        if (!dir.exists()) {
-            if (dir.mkdirs()) {
-                log.info("Created data model storage directory: {}", STORAGE_DIR);
+        // Migration logic
+        Path legacyDir = Paths.get(BASE_DIR, "datamodels");
+        Path defaultSpaceDir = Paths.get(BASE_DIR, "spaces", "default", "datamodels");
+
+        if (Files.exists(legacyDir) && Files.isDirectory(legacyDir)) {
+            try {
+                if (!Files.exists(defaultSpaceDir)) {
+                    Files.createDirectories(defaultSpaceDir);
+                }
+
+                try (Stream<Path> paths = Files.list(legacyDir)) {
+                    paths.filter(Files::isRegularFile)
+                            .filter(p -> p.toString().endsWith(".json"))
+                            .forEach(p -> {
+                                try {
+                                    Files.move(p, defaultSpaceDir.resolve(p.getFileName()));
+                                    log.info("Migrated legacy data model {} to default space", p.getFileName());
+                                } catch (IOException e) {
+                                    log.error("Failed to migrate " + p, e);
+                                }
+                            });
+                }
+            } catch (IOException e) {
+                log.error("Migration failed", e);
             }
-        } else {
-            log.info("Using data model storage directory: {}", STORAGE_DIR);
         }
     }
 
-    public List<DataModel> getAllDataModels() {
-        try (Stream<Path> paths = Files.walk(Paths.get(STORAGE_DIR))) {
+    private Path getStoragePath(String spaceId) {
+        return Paths.get(BASE_DIR, "spaces", spaceId, "datamodels");
+    }
+
+    public List<DataModel> getAllDataModels(String spaceId) {
+        Path dir = getStoragePath(spaceId);
+        if (!Files.exists(dir)) return Collections.emptyList();
+
+        try (Stream<Path> paths = Files.walk(dir)) {
             return paths
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".json"))
@@ -50,31 +75,40 @@ public class DataModelService {
                     .filter(model -> model != null)
                     .collect(Collectors.toList());
         } catch (IOException e) {
-            log.error("Failed to list data models", e);
+            log.error("Failed to list data models for space " + spaceId, e);
             return Collections.emptyList();
         }
     }
 
-    public void saveDataModel(DataModel dataModel) {
+    public void saveDataModel(String spaceId, DataModel dataModel) {
         if (dataModel == null || dataModel.getName() == null) {
             throw new IllegalArgumentException("Data Model or Name cannot be null");
         }
-        Path path = Paths.get(STORAGE_DIR, dataModel.getName() + ".json");
+        Path dir = getStoragePath(spaceId);
+        if (!Files.exists(dir)) {
+            try {
+                Files.createDirectories(dir);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to create directory " + dir, e);
+            }
+        }
+
+        Path path = dir.resolve(dataModel.getName() + ".json");
         try {
             String json = JSON.toJSONString(dataModel, true);
             Files.write(path, json.getBytes(StandardCharsets.UTF_8));
-            log.info("Saved data model: {}", dataModel.getName());
+            log.info("Saved data model: {} in space {}", dataModel.getName(), spaceId);
         } catch (IOException e) {
             log.error("Failed to save data model: " + dataModel.getName(), e);
             throw new RuntimeException("Failed to save data model", e);
         }
     }
 
-    public void deleteDataModel(String name) {
-        Path path = Paths.get(STORAGE_DIR, name + ".json");
+    public void deleteDataModel(String spaceId, String name) {
+        Path path = getStoragePath(spaceId).resolve(name + ".json");
         try {
             Files.deleteIfExists(path);
-            log.info("Deleted data model: {}", name);
+            log.info("Deleted data model: {} from space {}", name, spaceId);
         } catch (IOException e) {
             log.error("Failed to delete data model: " + name, e);
             throw new RuntimeException("Failed to delete data model", e);

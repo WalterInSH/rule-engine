@@ -22,26 +22,53 @@ import java.util.stream.Stream;
 @Slf4j
 public class RuleSetService {
 
-    private final String STORAGE_DIR;
+    private final String BASE_DIR;
 
     public RuleSetService(@Value("${app.storage.base-dir}") String baseDir) {
-        this.STORAGE_DIR = Paths.get(baseDir, "rulesets").toString();
+        this.BASE_DIR = baseDir;
     }
 
     @PostConstruct
     public void init() {
-        File dir = new File(STORAGE_DIR);
-        if (!dir.exists()) {
-            if (dir.mkdirs()) {
-                log.info("Created rule set storage directory: {}", STORAGE_DIR);
+        // Migration logic: Move legacy rulesets to default space
+        Path legacyDir = Paths.get(BASE_DIR, "rulesets");
+        Path defaultSpaceDir = Paths.get(BASE_DIR, "spaces", "default", "rulesets");
+        
+        if (Files.exists(legacyDir) && Files.isDirectory(legacyDir)) {
+            try {
+                if (!Files.exists(defaultSpaceDir)) {
+                    Files.createDirectories(defaultSpaceDir);
+                }
+                
+                try (Stream<Path> paths = Files.list(legacyDir)) {
+                    paths.filter(Files::isRegularFile)
+                         .filter(p -> p.toString().endsWith(".json"))
+                         .forEach(p -> {
+                             try {
+                                 Files.move(p, defaultSpaceDir.resolve(p.getFileName()));
+                                 log.info("Migrated legacy ruleset {} to default space", p.getFileName());
+                             } catch (IOException e) {
+                                 log.error("Failed to migrate " + p, e);
+                             }
+                         });
+                }
+                // Optional: remove legacy dir if empty
+                // Files.deleteIfExists(legacyDir);
+            } catch (IOException e) {
+                log.error("Migration failed", e);
             }
-        } else {
-            log.info("Using rule set storage directory: {}", STORAGE_DIR);
         }
     }
 
-    public List<RuleSet> getAllRuleSets() {
-        try (Stream<Path> paths = Files.walk(Paths.get(STORAGE_DIR))) {
+    private Path getStoragePath(String spaceId) {
+        return Paths.get(BASE_DIR, "spaces", spaceId, "rulesets");
+    }
+
+    public List<RuleSet> getAllRuleSets(String spaceId) {
+        Path dir = getStoragePath(spaceId);
+        if (!Files.exists(dir)) return Collections.emptyList();
+
+        try (Stream<Path> paths = Files.walk(dir)) {
             return paths
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().endsWith(".json"))
@@ -49,31 +76,40 @@ public class RuleSetService {
                     .filter(rs -> rs != null)
                     .collect(Collectors.toList());
         } catch (IOException e) {
-            log.error("Failed to list rule sets", e);
+            log.error("Failed to list rule sets for space " + spaceId, e);
             return Collections.emptyList();
         }
     }
 
-    public void saveRuleSet(RuleSet ruleSet) {
+    public void saveRuleSet(String spaceId, RuleSet ruleSet) {
         if (ruleSet == null || ruleSet.getName() == null) {
             throw new IllegalArgumentException("Rule Set or Name cannot be null");
         }
-        Path path = Paths.get(STORAGE_DIR, ruleSet.getName() + ".json");
+        Path dir = getStoragePath(spaceId);
+        if (!Files.exists(dir)) {
+            try {
+                Files.createDirectories(dir);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to create directory " + dir, e);
+            }
+        }
+
+        Path path = dir.resolve(ruleSet.getName() + ".json");
         try {
             String json = JSON.toJSONString(ruleSet, true);
             Files.write(path, json.getBytes(StandardCharsets.UTF_8));
-            log.info("Saved rule set: {}", ruleSet.getName());
+            log.info("Saved rule set: {} in space {}", ruleSet.getName(), spaceId);
         } catch (IOException e) {
             log.error("Failed to save rule set: " + ruleSet.getName(), e);
             throw new RuntimeException("Failed to save rule set", e);
         }
     }
 
-    public void deleteRuleSet(String name) {
-        Path path = Paths.get(STORAGE_DIR, name + ".json");
+    public void deleteRuleSet(String spaceId, String name) {
+        Path path = getStoragePath(spaceId).resolve(name + ".json");
         try {
             Files.deleteIfExists(path);
-            log.info("Deleted rule set: {}", name);
+            log.info("Deleted rule set: {} from space {}", name, spaceId);
         } catch (IOException e) {
             log.error("Failed to delete rule set: " + name, e);
             throw new RuntimeException("Failed to delete rule set", e);

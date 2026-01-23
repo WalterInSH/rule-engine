@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/enums")
+@RequestMapping("/api/spaces/{spaceId}/enums")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:3000")
 public class EnumController {
@@ -16,18 +16,18 @@ public class EnumController {
     private final EnumService enumService;
 
     @GetMapping
-    public List<EnumDefinition> getAll() {
-        return enumService.getAllEnums();
+    public List<EnumDefinition> getAll(@PathVariable String spaceId) {
+        return enumService.getAllEnums(spaceId);
     }
 
     @PostMapping
-    public EnumDefinition save(@RequestBody EnumDefinition enumDefinition) {
-        enumService.saveEnum(enumDefinition);
+    public EnumDefinition save(@PathVariable String spaceId, @RequestBody EnumDefinition enumDefinition) {
+        enumService.saveEnum(spaceId, enumDefinition);
         return enumDefinition;
     }
 
     @DeleteMapping("/{name}")
-    public void delete(@PathVariable String name) {
-        enumService.deleteEnum(name);
+    public void delete(@PathVariable String spaceId, @PathVariable String name) {
+        enumService.deleteEnum(spaceId, name);
     }
 }

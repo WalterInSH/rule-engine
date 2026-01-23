@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/datamodels")
+@RequestMapping("/api/spaces/{spaceId}/datamodels")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:3000") // Allow frontend access
 public class DataModelController {
@@ -16,18 +16,18 @@ public class DataModelController {
     private final DataModelService dataModelService;
 
     @GetMapping
-    public List<DataModel> getAll() {
-        return dataModelService.getAllDataModels();
+    public List<DataModel> getAll(@PathVariable String spaceId) {
+        return dataModelService.getAllDataModels(spaceId);
     }
 
     @PostMapping
-    public DataModel save(@RequestBody DataModel dataModel) {
-        dataModelService.saveDataModel(dataModel);
+    public DataModel save(@PathVariable String spaceId, @RequestBody DataModel dataModel) {
+        dataModelService.saveDataModel(spaceId, dataModel);
         return dataModel;
     }
 
     @DeleteMapping("/{name}")
-    public void delete(@PathVariable String name) {
-        dataModelService.deleteDataModel(name);
+    public void delete(@PathVariable String spaceId, @PathVariable String name) {
+        dataModelService.deleteDataModel(spaceId, name);
     }
 }

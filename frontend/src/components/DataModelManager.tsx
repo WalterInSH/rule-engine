@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DataModel, FieldDefinition, FieldType, DataModelCategory, DataModelSourceType, EnumDefinition } from '@/types/DataModel';
-
-const API_URL = 'http://localhost:8080/api/datamodels';
-const ENUM_API_URL = 'http://localhost:8080/api/enums';
+import { getSpaceApiUrl } from '@/utils/apiConfig';
 
 interface DataModelManagerProps {
   category: DataModelCategory;
@@ -18,7 +16,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
 
   const fetchDataModels = useCallback(async () => {
     try {
-      const res = await fetch(API_URL);
+      const res = await fetch(getSpaceApiUrl('datamodels'));
       if (res.ok) {
         const data: DataModel[] = await res.json();
         // Filter models by category
@@ -31,7 +29,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
 
   const fetchEnums = useCallback(async () => {
     try {
-      const res = await fetch(ENUM_API_URL);
+      const res = await fetch(getSpaceApiUrl('enums'));
       if (res.ok) {
         const data: EnumDefinition[] = await res.json();
         setEnums(data);
@@ -44,6 +42,16 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
   useEffect(() => {
     fetchDataModels();
     fetchEnums();
+
+    const handleSpaceChange = () => {
+        fetchDataModels();
+        fetchEnums();
+    };
+
+    window.addEventListener('spaceChanged', handleSpaceChange);
+    return () => {
+        window.removeEventListener('spaceChanged', handleSpaceChange);
+    };
   }, [fetchDataModels, fetchEnums]);
 
   const handleCreateModel = () => {
@@ -66,7 +74,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
   const handleDeleteModel = async (name: string) => {
     if (!confirm(`Are you sure you want to delete ${name}?`)) return;
     try {
-      await fetch(`${API_URL}/${name}`, { method: 'DELETE' });
+      await fetch(`${getSpaceApiUrl('datamodels')}/${name}`, { method: 'DELETE' });
       fetchDataModels();
       if (selectedModel?.name === name) {
         setSelectedModel(null);
@@ -80,7 +88,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
   const handleSaveModel = async () => {
     if (!selectedModel || !selectedModel.name) return;
     try {
-      const res = await fetch(API_URL, {
+      const res = await fetch(getSpaceApiUrl('datamodels'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedModel),

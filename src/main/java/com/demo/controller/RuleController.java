@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/rules")
+@RequestMapping("/api/spaces/{spaceId}/rules")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "http://localhost:3000")
 public class RuleController {
@@ -17,7 +17,7 @@ public class RuleController {
     private final RuleEngine ruleEngine;
 
     @PostMapping("/execute")
-    public JSONObject execute(@RequestBody JSONObject params) {
+    public JSONObject execute(@PathVariable String spaceId, @RequestBody JSONObject params) {
         long start = System.currentTimeMillis();
         ruleEngine.execute(params);
         long duration = System.currentTimeMillis() - start;
@@ -29,8 +29,8 @@ public class RuleController {
     }
 
     @PostMapping("/reload")
-    public String reload(@RequestBody com.demo.common.RuleSet ruleSet) {
-        ruleEngine.loadRules(ruleSet);
-        return "Loaded " + (ruleSet.getRules() != null ? ruleSet.getRules().size() : 0) + " rules.";
+    public String reload(@PathVariable String spaceId, @RequestBody com.demo.common.RuleSet ruleSet) {
+        ruleEngine.loadRules(spaceId, ruleSet);
+        return "Loaded " + (ruleSet.getRules() != null ? ruleSet.getRules().size() : 0) + " rules for space " + spaceId;
     }
 }

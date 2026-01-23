@@ -12,11 +12,7 @@ import RuleSetList from '@/components/rules/RuleSetList';
 import RuleList from '@/components/rules/RuleList';
 import RuleModal from '@/components/rules/RuleModal';
 import Simulator from '@/components/rules/Simulator';
-
-const RULESETS_API = 'http://localhost:8080/api/rulesets';
-const RULES_EXEC_API = 'http://localhost:8080/api/rules';
-const DATAMODELS_API = 'http://localhost:8080/api/datamodels';
-const ENUMS_API = 'http://localhost:8080/api/enums';
+import { getSpaceApiUrl } from '@/utils/apiConfig';
 
 export default function RulesPage() {
   const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
@@ -34,14 +30,29 @@ export default function RulesPage() {
   const [execResult, setExecResult] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchRuleSets();
-    fetchDataModels();
-    fetchEnums();
+    fetchAll();
+
+    const handleSpaceChange = () => {
+        fetchAll();
+        setSelectedRuleSet(null);
+        setIsEditing(false);
+    };
+
+    window.addEventListener('spaceChanged', handleSpaceChange);
+    return () => {
+        window.removeEventListener('spaceChanged', handleSpaceChange);
+    };
   }, []);
+
+  const fetchAll = () => {
+      fetchRuleSets();
+      fetchDataModels();
+      fetchEnums();
+  };
 
   const fetchRuleSets = async () => {
     try {
-      const res = await fetch(RULESETS_API);
+      const res = await fetch(getSpaceApiUrl('rulesets'));
       if (res.ok) setRuleSets(await res.json());
     } catch (e) {
       console.error('Failed to fetch rule sets', e);
@@ -50,7 +61,7 @@ export default function RulesPage() {
 
   const fetchDataModels = async () => {
     try {
-      const res = await fetch(DATAMODELS_API);
+      const res = await fetch(getSpaceApiUrl('datamodels'));
       if (res.ok) setDataModels(await res.json());
     } catch (e) {
       console.error('Failed to fetch data models', e);
@@ -59,7 +70,7 @@ export default function RulesPage() {
 
   const fetchEnums = async () => {
     try {
-      const res = await fetch(ENUMS_API);
+      const res = await fetch(getSpaceApiUrl('enums'));
       if (res.ok) setEnums(await res.json());
     } catch (e) {
       console.error('Failed to fetch enums', e);
@@ -79,7 +90,7 @@ export default function RulesPage() {
 
   const handleDeleteRuleSet = async (name: string) => {
     if (!confirm(`Delete rule set ${name}?`)) return;
-    await fetch(`${RULESETS_API}/${name}`, { method: 'DELETE' });
+    await fetch(`${getSpaceApiUrl('rulesets')}/${name}`, { method: 'DELETE' });
     fetchRuleSets();
     if (selectedRuleSet?.name === name) {
       setSelectedRuleSet(null);
@@ -89,7 +100,7 @@ export default function RulesPage() {
 
   const handleSaveRuleSet = async () => {
     if (!selectedRuleSet?.name) return;
-    await fetch(RULESETS_API, {
+    await fetch(getSpaceApiUrl('rulesets'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(selectedRuleSet)
@@ -160,7 +171,7 @@ export default function RulesPage() {
     if (!selectedRuleSet) return;
     
     // 1. Reload Rules (Send RuleSet now)
-    const loadRes = await fetch(`${RULES_EXEC_API}/reload`, {
+    const loadRes = await fetch(`${getSpaceApiUrl('rules')}/reload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(selectedRuleSet)
@@ -174,7 +185,7 @@ export default function RulesPage() {
     // 2. Execute
     try {
       const params = JSON.parse(execParams);
-      const execRes = await fetch(`${RULES_EXEC_API}/execute`, {
+      const execRes = await fetch(`${getSpaceApiUrl('rules')}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)

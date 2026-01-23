@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import SpaceSelector from './SpaceSelector';
 
 const Navbar = () => {
   return (
@@ -7,7 +8,8 @@ const Navbar = () => {
         <div className="text-xl font-bold tracking-tight">
           <Link href="/">Rule Engine Admin</Link>
         </div>
-        <div className="space-x-6">
+        <div className="space-x-6 flex items-center">
+          <SpaceSelector />
           <Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link>
           <div className="relative group inline-block">
             <button className="hover:text-blue-400 transition-colors flex items-center cursor-pointer">

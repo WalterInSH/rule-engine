@@ -21,6 +21,7 @@ import java.util.Scanner;
 public class RuleEngine {
     private volatile List<RunTimeRule> activeRules = new ArrayList<>();
     private volatile List<String> activeInternalModels = new ArrayList<>();
+    private volatile String currentSpaceId = "default";
 
     private final com.demo.service.DataModelService dataModelService;
     private final List<com.demo.loader.DataLoader> dataLoaders;
@@ -45,7 +46,7 @@ public class RuleEngine {
                 com.demo.common.RuleSet rs = new com.demo.common.RuleSet();
                 rs.setRules(rules);
                 rs.setRunType(com.demo.common.RuleRunType.SYNC); 
-                loadRules(rs);
+                loadRules("default", rs);
             } else {
                 log.warn("rules.json not found in classpath.");
             }
@@ -54,13 +55,14 @@ public class RuleEngine {
         }
     }
 
-    public void loadRules(com.demo.common.RuleSet ruleSet) {
+    public void loadRules(String spaceId, com.demo.common.RuleSet ruleSet) {
         if (ruleSet == null) {
             this.activeRules = Collections.emptyList();
             this.activeInternalModels = Collections.emptyList();
             return;
         }
-
+        
+        this.currentSpaceId = spaceId;
         this.activeInternalModels = ruleSet.getInternalModels() != null ? ruleSet.getInternalModels() : new ArrayList<>();
         
         if (ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
@@ -91,14 +93,14 @@ public class RuleEngine {
             }
         }
         this.activeRules = newRules;
-        log.info("Successfully loaded {} rules and configured {} internal models.", newRules.size(), activeInternalModels.size());
+        log.info("Successfully loaded {} rules and configured {} internal models for space {}.", newRules.size(), activeInternalModels.size(), spaceId);
     }
 
     public void execute(JSONObject params) {
         // Load data from internal models
         for (String modelName : activeInternalModels) {
             try {
-                com.demo.common.DataModel model = dataModelService.getAllDataModels().stream()
+                com.demo.common.DataModel model = dataModelService.getAllDataModels(currentSpaceId).stream()
                         .filter(m -> m.getName().equals(modelName))
                         .findFirst()
                         .orElse(null);
