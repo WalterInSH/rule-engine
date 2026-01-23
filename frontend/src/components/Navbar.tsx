@@ -9,7 +9,8 @@ const Navbar = () => {
         </div>
         <div className="space-x-6">
           <Link href="/" className="hover:text-blue-400 transition-colors">Dashboard</Link>
-          <Link href="/datamodels" className="hover:text-blue-400 transition-colors">Data Models</Link>
+          <Link href="/datamodels/input" className="hover:text-blue-400 transition-colors">Input Models</Link>
+          <Link href="/datamodels/output" className="hover:text-blue-400 transition-colors">Output Models</Link>
           <Link href="/rules" className="hover:text-blue-400 transition-colors">Rules</Link>
           <Link href="/simulator" className="hover:text-blue-400 transition-colors">Simulator</Link>
         </div>
