@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { DataModel, FieldDefinition, FieldType, DataModelCategory } from '@/types/DataModel';
+import { DataModel, FieldDefinition, FieldType, DataModelCategory, EnumDefinition } from '@/types/DataModel';
 
 const API_URL = 'http://localhost:8080/api/datamodels';
+const ENUM_API_URL = 'http://localhost:8080/api/enums';
 
 interface DataModelManagerProps {
   category: DataModelCategory;
@@ -11,6 +12,7 @@ interface DataModelManagerProps {
 
 export default function DataModelManager({ category }: DataModelManagerProps) {
   const [dataModels, setDataModels] = useState<DataModel[]>([]);
+  const [enums, setEnums] = useState<EnumDefinition[]>([]);
   const [selectedModel, setSelectedModel] = useState<DataModel | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -27,9 +29,22 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
     }
   }, [category]);
 
+  const fetchEnums = useCallback(async () => {
+    try {
+      const res = await fetch(ENUM_API_URL);
+      if (res.ok) {
+        const data: EnumDefinition[] = await res.json();
+        setEnums(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch enums', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDataModels();
-  }, [fetchDataModels]);
+    fetchEnums();
+  }, [fetchDataModels, fetchEnums]);
 
   const handleCreateModel = () => {
     setSelectedModel({
@@ -91,6 +106,12 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
     if (!selectedModel) return;
     const newFields = [...selectedModel.fields];
     newFields[index] = { ...newFields[index], [key]: value };
+    
+    // If type changes to something other than ENUM, clear enumName
+    if (key === 'type' && value !== FieldType.ENUM) {
+       delete newFields[index].enumName;
+    }
+
     setSelectedModel({ ...selectedModel, fields: newFields });
   };
 
@@ -179,8 +200,6 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
                   />
                 </div>
 
-                {/* Category is implicitly handled by the manager, so we don't need a selector */}
-
                 <div className="mt-8">
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-lg font-medium text-slate-700 dark:text-slate-200">Fields</label>
@@ -214,7 +233,22 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
                           <option value={FieldType.STRING}>String</option>
                           <option value={FieldType.NUMBER}>Number</option>
                           <option value={FieldType.BOOLEAN}>Boolean</option>
+                          <option value={FieldType.ENUM}>Enum</option>
                         </select>
+                        
+                        {field.type === FieldType.ENUM && (
+                          <select
+                            value={field.enumName || ''}
+                            onChange={(e) => handleFieldChange(index, 'enumName', e.target.value)}
+                            className="w-40 border border-slate-300 dark:border-slate-600 rounded px-2 py-1 text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900"
+                          >
+                            <option value="">Select Enum...</option>
+                            {enums.map(e => (
+                              <option key={e.name} value={e.name}>{e.name}</option>
+                            ))}
+                          </select>
+                        )}
+
                         <button
                           onClick={() => handleDeleteField(index)}
                           className="text-red-500 hover:text-red-700 px-2"

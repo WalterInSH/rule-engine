@@ -2,6 +2,7 @@ export enum FieldType {
   STRING = 'STRING',
   NUMBER = 'NUMBER',
   BOOLEAN = 'BOOLEAN',
+  ENUM = 'ENUM',
 }
 
 export enum DataModelCategory {
@@ -12,6 +13,7 @@ export enum DataModelCategory {
 export interface FieldDefinition {
   name: string;
   type: FieldType;
+  enumName?: string;
 }
 
 export interface DataModel {
@@ -19,4 +21,10 @@ export interface DataModel {
   description: string;
   category?: DataModelCategory;
   fields: FieldDefinition[];
+}
+
+export interface EnumDefinition {
+  name: string;
+  description: string;
+  values: string[];
 }
