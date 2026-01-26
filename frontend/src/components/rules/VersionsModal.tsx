@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-interface VersionInfo {
+export interface VersionInfo {
   filename: string;
   tag: string;
   date?: string;

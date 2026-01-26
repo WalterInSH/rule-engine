@@ -11,7 +11,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/spaces/{spaceId}/rulesets")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
 public class RuleSetController {
 
     private final RuleSetService ruleSetService;

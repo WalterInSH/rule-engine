@@ -1,6 +1,5 @@
 package com.demo.engine;
 
-import com.alibaba.fastjson.JSONObject;
 import com.demo.common.RuleActionType;
 import com.demo.common.RuleRunType;
 
@@ -15,7 +14,7 @@ public interface ExecuteRule {
 
     int getPriority();
 
-    boolean isFired(JSONObject params) throws Exception;
+    boolean isFired(RuleContext context) throws Exception;
 
-    void executeAction(JSONObject params) throws Exception;
+    void executeAction(RuleContext context) throws Exception;
 }

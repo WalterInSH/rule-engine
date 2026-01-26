@@ -1,6 +1,6 @@
 import { Space } from '@/types/Space';
 
-const API_BASE = 'http://localhost:8080/api/spaces';
+const API_BASE = 'http://localhost:8085/api/spaces';
 const STORAGE_KEY = 'current_space_id';
 
 export const getCurrentSpaceId = (): string => {

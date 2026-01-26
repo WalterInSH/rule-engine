@@ -10,5 +10,6 @@ public class RuleSet {
     private String version;
     private RuleRunType runType;
     private List<String> internalModels;
+    private List<String> outputModels;
     private List<Rule> rules;
 }

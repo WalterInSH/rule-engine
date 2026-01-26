@@ -18,7 +18,7 @@ public class SimpleRuleBuilder {
         
         // Header
         Set<String> imports = Sets.newTreeSet();
-        imports.add("com.alibaba.fastjson.JSONObject");
+        imports.add("com.demo.engine.RuleContext");
         imports.add("com.demo.engine.RunTimeRule");
         imports.add("com.demo.common.RuleActionType");
         imports.add("com.demo.common.RuleRunType");
@@ -31,7 +31,7 @@ public class SimpleRuleBuilder {
         jClass.addMethod(new JMethod("getRunType", null, "RuleRunType", "return RuleRunType." + runType + ";", null, null));
 
         // isFired
-        List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "JSONObject"));
+        List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "RuleContext"));
         List<String> exceptions = Collections.singletonList("Exception");
         
         jClass.addMethod(new JMethod("isFired", null, "boolean", "return " + rule.getCondition() + ";", params, exceptions));

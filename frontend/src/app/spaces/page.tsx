@@ -11,14 +11,14 @@ export default function SpacesPage() {
   const [newSpace, setNewSpace] = useState<Space>({ id: '', name: '', description: '' });
   const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
-    loadSpaces();
-  }, []);
-
   const loadSpaces = async () => {
     const list = await fetchSpaces();
     setSpaces(list);
   };
+
+  useEffect(() => {
+    loadSpaces();
+  }, []);
 
   const handleCreate = async () => {
     if (!newSpace.name) return;

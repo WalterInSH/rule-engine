@@ -21,6 +21,7 @@ import java.util.Scanner;
 public class RuleEngine {
     private volatile List<RunTimeRule> activeRules = new ArrayList<>();
     private volatile List<String> activeInternalModels = new ArrayList<>();
+    private volatile List<String> activeOutputModels = new ArrayList<>();
     private volatile String currentSpaceId = "default";
     private volatile String currentVersion = "init";
 
@@ -70,6 +71,7 @@ public class RuleEngine {
         
         this.currentSpaceId = spaceId;
         this.activeInternalModels = ruleSet.getInternalModels() != null ? ruleSet.getInternalModels() : new ArrayList<>();
+        this.activeOutputModels = ruleSet.getOutputModels() != null ? ruleSet.getOutputModels() : new ArrayList<>();
         this.currentVersion = ruleSet.getVersion() != null ? ruleSet.getVersion() : "v" + System.currentTimeMillis();
         
         if (ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
@@ -103,7 +105,11 @@ public class RuleEngine {
         log.info("Successfully loaded {} rules and configured {} internal models for space {}.", newRules.size(), activeInternalModels.size(), spaceId);
     }
 
-    public void execute(JSONObject params) {
+    public RuleExecutionResult execute(JSONObject params) {
+        // 1. Capture Original Input (Deep Copy)
+        JSONObject input = JSONObject.parseObject(JSONObject.toJSONString(params));
+        List<RuleExecutionResult.InternalModelEntry> internalModels = new ArrayList<>();
+
         // Load data from internal models
         for (String modelName : activeInternalModels) {
             try {
@@ -119,6 +125,7 @@ public class RuleEngine {
                             JSONObject modelData = loader.load(model);
                             if (modelData != null) {
                                 params.putAll(modelData);
+                                internalModels.add(new RuleExecutionResult.InternalModelEntry(modelName, modelData));
                                 loaded = true;
                                 break; // Stop after first successful loader matches and loads
                             }
@@ -135,7 +142,17 @@ public class RuleEngine {
             }
         }
 
+        // Create RuleContext with merged params (Input + Internal) as the "Source"
+        RuleContext context = new RuleContext(params);
+        
         ExecutePolicy policy = new ExecutePolicy(activeRules);
-        policy.execute(params);
+        policy.execute(context);
+
+        RuleExecutionResult result = new RuleExecutionResult();
+        result.setInput(input);
+        result.setInternalModels(internalModels);
+        // Output now comes strictly from what rules have written to the context's output
+        result.setOutput(context.getOutput());
+        return result;
     }
 }

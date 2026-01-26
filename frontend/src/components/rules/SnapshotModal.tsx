@@ -23,7 +23,7 @@ export default function SnapshotModal({ isOpen, onClose, onCreate }: SnapshotMod
         <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md p-6">
             <h2 className="text-xl font-bold mb-4 dark:text-slate-100">Create Snapshot</h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-                Enter a tag name for this version (e.g., "v1.0", "release-candidate").
+                Enter a tag name for this version (e.g., &quot;v1.0&quot;, &quot;release-candidate&quot;).
             </p>
             
             <input 

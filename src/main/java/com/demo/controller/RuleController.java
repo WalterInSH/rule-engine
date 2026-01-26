@@ -19,7 +19,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/spaces/{spaceId}/rules")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
 @Slf4j
 public class RuleController {
 
@@ -55,8 +54,15 @@ public class RuleController {
                 
                 ExecutionLogSummary summary = new ExecutionLogSummary();
                 summary.setFileName(f.getName());
-                summary.setStartTime(json.getString("_startTime"));
-                summary.setDurationMs(json.getLongValue("_durationMs"));
+                
+                if (json.containsKey("output") && json.get("output") instanceof JSONObject) {
+                    JSONObject output = json.getJSONObject("output");
+                    summary.setStartTime(output.getString("_startTime"));
+                    summary.setDurationMs(output.getLongValue("_durationMs"));
+                } else {
+                    summary.setStartTime(json.getString("_startTime"));
+                    summary.setDurationMs(json.getLongValue("_durationMs"));
+                }
                 
                 // Parse version from filename: version_timestamp.json
                 // But version might contain underscores? 
@@ -99,17 +105,19 @@ public class RuleController {
     }
 
     @PostMapping("/execute")
-    public JSONObject execute(@PathVariable String spaceId, @RequestBody JSONObject params) {
+    public com.demo.engine.RuleExecutionResult execute(@PathVariable String spaceId, @RequestBody JSONObject params) {
         long start = System.currentTimeMillis();
-        ruleEngine.execute(params);
+        com.demo.engine.RuleExecutionResult result = ruleEngine.execute(params);
         long duration = System.currentTimeMillis() - start;
         
         Date now = new Date(start);
         String dateStr = new SimpleDateFormat("yyyy-MM-dd").format(now);
         String timeStr = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(now);
         
-        params.put("_startTime", timeStr);
-        params.put("_durationMs", duration);
+        if (result.getOutput() != null) {
+            result.getOutput().put("_startTime", timeStr);
+            result.getOutput().put("_durationMs", duration);
+        }
         
         // Log execution to file
         try {
@@ -123,13 +131,13 @@ public class RuleController {
             }
             
             File logFile = new File(spaceDir, fileName);
-            String jsonContent = JSONObject.toJSONString(params, SerializerFeature.PrettyFormat);
+            String jsonContent = JSONObject.toJSONString(result, SerializerFeature.PrettyFormat);
             Files.write(logFile.toPath(), jsonContent.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             log.error("Failed to write execution log for space {}", spaceId, e);
         }
 
-        return params;
+        return result;
     }
 
     @PostMapping("/reload")

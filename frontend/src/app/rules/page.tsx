@@ -4,12 +4,12 @@ import {useState, useEffect} from 'react';
 
 import {RuleSet} from '@/types/RuleSet';
 import {Rule, RuleActionType, RuleRunType} from '@/types/Rule';
-import {DataModel, EnumDefinition, DataModelCategory} from '@/types/DataModel';
+import {DataModel, EnumDefinition} from '@/types/DataModel';
 import {DropResult} from '@hello-pangea/dnd';
 
 import RuleSetList from '@/components/rules/RuleSetList';
 import RuleModal from '@/components/rules/RuleModal';
-import VersionsModal from '@/components/rules/VersionsModal';
+import VersionsModal, { VersionInfo } from '@/components/rules/VersionsModal';
 import SnapshotModal from '@/components/rules/SnapshotModal';
 import RuleSetEditor from '@/components/rules/RuleSetEditor';
 import NotificationToast from '@/components/rules/NotificationToast';
@@ -30,7 +30,7 @@ export default function RulesPage() {
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     // Versioning State
-    const [versions, setVersions] = useState<any[]>([]);
+    const [versions, setVersions] = useState<VersionInfo[]>([]);
     const [isVersionsModalOpen, setIsVersionsModalOpen] = useState(false);
     const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState(false);
 
@@ -44,28 +44,9 @@ export default function RulesPage() {
     const [execParams, setExecParams] = useState('{\n  \n}');
     const [execResult, setExecResult] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchAll();
-        const handleSpaceChange = () => {
-            fetchAll();
-            setSelectedRuleSet(null);
-            setIsEditing(false);
-        };
-        window.addEventListener('spaceChanged', handleSpaceChange);
-        return () => {
-            window.removeEventListener('spaceChanged', handleSpaceChange);
-        };
-    }, []);
-
     const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
         setNotification({message, type});
         setTimeout(() => setNotification(null), 3000);
-    };
-
-    const fetchAll = () => {
-        fetchRuleSets();
-        fetchDataModels();
-        fetchEnums();
     };
 
     const fetchRuleSets = async () => {
@@ -94,6 +75,25 @@ export default function RulesPage() {
             console.error('Failed to fetch enums', e);
         }
     };
+
+    const fetchAll = () => {
+        fetchRuleSets();
+        fetchDataModels();
+        fetchEnums();
+    };
+
+    useEffect(() => {
+        fetchAll();
+        const handleSpaceChange = () => {
+            fetchAll();
+            setSelectedRuleSet(null);
+            setIsEditing(false);
+        };
+        window.addEventListener('spaceChanged', handleSpaceChange);
+        return () => {
+            window.removeEventListener('spaceChanged', handleSpaceChange);
+        };
+    }, []);
 
     // Rule Set CRUD
     const handleCreateRuleSet = () => {
