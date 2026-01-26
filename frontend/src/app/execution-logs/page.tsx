@@ -88,7 +88,6 @@ export default function ExecutionLogsPage() {
                                         <th className="px-6 py-4">Start Time</th>
                                         <th className="px-6 py-4">Duration</th>
                                         <th className="px-6 py-4">Rule Version</th>
-                                        <th className="px-6 py-4">Log File</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -117,9 +116,6 @@ export default function ExecutionLogsPage() {
                                                     <Hash size={12} />
                                                     {log.version}
                                                 </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-500 text-xs font-mono truncate max-w-xs">
-                                                {log.fileName}
                                             </td>
                                         </motion.tr>
                                     ))}
