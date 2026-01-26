@@ -89,6 +89,36 @@ public class RuleController {
         return summaries;
     }
 
+    @GetMapping("/logs/{fileName}")
+    public Object getExecutionLogDetail(
+            @PathVariable String spaceId,
+            @PathVariable String fileName,
+            @RequestParam(required = false) String date) {
+
+        if (date == null || date.isEmpty()) {
+            date = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
+        }
+
+        // Validate fileName to prevent directory traversal
+        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            throw new IllegalArgumentException("Invalid filename");
+        }
+
+        File logFile = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + date + File.separator + fileName);
+
+        if (!logFile.exists()) {
+            return null;
+        }
+
+        try {
+            String content = new String(Files.readAllBytes(logFile.toPath()), StandardCharsets.UTF_8);
+            return JSONObject.parse(content);
+        } catch (Exception e) {
+            log.error("Failed to read log file: " + fileName, e);
+            throw new RuntimeException("Failed to read log");
+        }
+    }
+
     @lombok.Data
     public static class ExecutionLogSummary {
         private String fileName;

@@ -5,6 +5,7 @@ import {getSpaceApiUrl} from '@/utils/apiConfig';
 import {format} from 'date-fns';
 import {Calendar as CalendarIcon, Clock, FileText, Hash, Timer} from 'lucide-react';
 import {motion} from 'framer-motion';
+import LogDetailModal from '@/components/rules/LogDetailModal';
 
 interface ExecutionLog {
     fileName: string;
@@ -18,6 +19,7 @@ export default function ExecutionLogsPage() {
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [isLoading, setIsLoading] = useState(false);
     const [selectedLog, setSelectedLog] = useState<string | null>(null); // For future detail view
+    const [logDetailData, setLogDetailData] = useState<any | null>(null);
 
     useEffect(() => {
         fetchLogs();
@@ -43,6 +45,24 @@ export default function ExecutionLogsPage() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleLogClick = async (fileName: string) => {
+        setSelectedLog(fileName);
+        try {
+            const res = await fetch(`${getSpaceApiUrl('rules')}/logs/${fileName}?date=${selectedDate}`);
+            if (res.ok) {
+                const data = await res.json();
+                setLogDetailData(data);
+            }
+        } catch (e) {
+            console.error('Failed to fetch log detail', e);
+        }
+    };
+
+    const closeDetail = () => {
+        setSelectedLog(null);
+        setLogDetailData(null);
     };
 
     return (
@@ -107,10 +127,11 @@ export default function ExecutionLogsPage() {
                                         return (
                                         <motion.tr
                                             key={log.fileName}
+                                            onClick={() => handleLogClick(log.fileName)}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: index * 0.05 }}
-                                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                                         >
                                             <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-mono text-sm whitespace-nowrap">
                                                 <div className="flex items-center gap-2">
@@ -138,6 +159,13 @@ export default function ExecutionLogsPage() {
                     )}
                 </div>
             )}
+
+            <LogDetailModal 
+                isOpen={!!selectedLog && !!logDetailData} 
+                onClose={closeDetail} 
+                data={logDetailData}
+                fileName={selectedLog}
+            />
         </div>
     );
 }
