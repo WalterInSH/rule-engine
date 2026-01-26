@@ -22,6 +22,7 @@ public class RuleEngine {
     private volatile List<RunTimeRule> activeRules = new ArrayList<>();
     private volatile List<String> activeInternalModels = new ArrayList<>();
     private volatile String currentSpaceId = "default";
+    private volatile String currentVersion = "init";
 
     private final com.demo.service.DataModelService dataModelService;
     private final List<com.demo.loader.DataLoader> dataLoaders;
@@ -29,6 +30,10 @@ public class RuleEngine {
     public RuleEngine(com.demo.service.DataModelService dataModelService, List<com.demo.loader.DataLoader> dataLoaders) {
         this.dataModelService = dataModelService;
         this.dataLoaders = dataLoaders;
+    }
+
+    public String getCurrentVersion() {
+        return currentVersion;
     }
 
     @PostConstruct
@@ -59,11 +64,13 @@ public class RuleEngine {
         if (ruleSet == null) {
             this.activeRules = Collections.emptyList();
             this.activeInternalModels = Collections.emptyList();
+            this.currentVersion = "unknown";
             return;
         }
         
         this.currentSpaceId = spaceId;
         this.activeInternalModels = ruleSet.getInternalModels() != null ? ruleSet.getInternalModels() : new ArrayList<>();
+        this.currentVersion = ruleSet.getVersion() != null ? ruleSet.getVersion() : "v" + System.currentTimeMillis();
         
         if (ruleSet.getRules() == null || ruleSet.getRules().isEmpty()) {
             this.activeRules = Collections.emptyList();

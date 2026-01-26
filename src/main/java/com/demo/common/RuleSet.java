@@ -7,6 +7,7 @@ import java.util.List;
 public class RuleSet {
     private String name;
     private String description;
+    private String version;
     private RuleRunType runType;
     private List<String> internalModels;
     private List<Rule> rules;

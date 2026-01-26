@@ -76,9 +76,9 @@ export default function SpacesPage() {
       <AnimatePresence>
         {isCreating && (
           <motion.div
-            initial={{ opacity: 0, height: 0, mb: 0 }}
-            animate={{ opacity: 1, height: 'auto', mb: 40 }}
-            exit={{ opacity: 0, height: 0, mb: 0 }}
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 40 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
             className="overflow-hidden"
           >
             <div className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl p-8 border border-slate-200 dark:border-slate-800 relative overflow-hidden">
