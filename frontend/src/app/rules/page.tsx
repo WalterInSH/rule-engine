@@ -1,16 +1,16 @@
 'use client';
 
-'use client';
-
 import { useState, useEffect } from 'react';
 import { RuleSet } from '@/types/RuleSet';
 import { Rule, RuleActionType, RuleRunType } from '@/types/Rule';
 import { DataModel, EnumDefinition, DataModelCategory } from '@/types/DataModel';
 import { DropResult } from '@hello-pangea/dnd';
+import { Check, Loader2 } from 'lucide-react';
 
 import RuleSetList from '@/components/rules/RuleSetList';
 import RuleList from '@/components/rules/RuleList';
 import RuleModal from '@/components/rules/RuleModal';
+import VersionsModal from '@/components/rules/VersionsModal';
 import Simulator from '@/components/rules/Simulator';
 import { getSpaceApiUrl } from '@/utils/apiConfig';
 
@@ -20,11 +20,16 @@ export default function RulesPage() {
   const [enums, setEnums] = useState<EnumDefinition[]>([]);
   const [selectedRuleSet, setSelectedRuleSet] = useState<RuleSet | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  
+
   // Rule Editing State
   const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
-  
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // Versioning State
+  const [versions, setVersions] = useState<any[]>([]);
+  const [isVersionsModalOpen, setIsVersionsModalOpen] = useState(false);
+
   // Execution State
   const [execParams, setExecParams] = useState('{\n  \n}');
   const [execResult, setExecResult] = useState<string | null>(null);
@@ -100,14 +105,89 @@ export default function RulesPage() {
 
   const handleSaveRuleSet = async () => {
     if (!selectedRuleSet?.name) return;
-    await fetch(getSpaceApiUrl('rulesets'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(selectedRuleSet)
-    });
-    fetchRuleSets();
-    setIsEditing(false);
-    setSelectedRuleSet(null);
+    setSaveStatus('saving');
+    try {
+      await fetch(getSpaceApiUrl('rulesets'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(selectedRuleSet)
+      });
+      fetchRuleSets();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (e) {
+      console.error(e);
+      setSaveStatus('idle'); // Or error state if we had one
+      alert('Failed to save rule set');
+    }
+  };
+
+  const handleSnapshot = async () => {
+    if (!selectedRuleSet?.name) return;
+    const tag = prompt("Enter a tag/name for this version (e.g. 'v1.0', 'release-candidate'):");
+    if (!tag) return;
+
+    try {
+        const res = await fetch(`${getSpaceApiUrl('rulesets')}/${selectedRuleSet.name}/snapshot?tag=${encodeURIComponent(tag)}`, {
+            method: 'POST'
+        });
+        if (res.ok) {
+            alert('Snapshot created successfully!');
+        } else {
+            alert('Failed to create snapshot.');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error creating snapshot.');
+    }
+  };
+
+  const handleShowVersions = async () => {
+      if (!selectedRuleSet?.name) return;
+      try {
+          const res = await fetch(`${getSpaceApiUrl('rulesets')}/${selectedRuleSet.name}/versions`);
+          if (res.ok) {
+              setVersions(await res.json());
+              setIsVersionsModalOpen(true);
+          }
+      } catch (e) {
+          console.error(e);
+      }
+  };
+
+  const handleRestore = async (versionFilename: string) => {
+      if (!selectedRuleSet?.name) return;
+      try {
+          const res = await fetch(`${getSpaceApiUrl('rulesets')}/${selectedRuleSet.name}/restore?version=${encodeURIComponent(versionFilename)}`, {
+              method: 'POST'
+          });
+          if (res.ok) {
+              alert('Version restored successfully! Reloading...');
+              // Reload rule sets and select the current one again
+              await fetchRuleSets();
+              // Re-fetch the specific rule set to update UI
+              // Since fetchRuleSets updates the list, we need to find it again from the new list or fetch individually.
+              // For simplicity, we just fetch list and let user re-select or we manually update selectedRuleSet
+              // But `selectedRuleSet` is local state. We need to update it.
+
+              // Let's refetch all to be safe and update selected
+              const listRes = await fetch(getSpaceApiUrl('rulesets'));
+              if (listRes.ok) {
+                  const list = await listRes.json();
+                  setRuleSets(list);
+                  const updated = list.find((r: RuleSet) => r.name === selectedRuleSet.name);
+                  if (updated) {
+                      setSelectedRuleSet(updated);
+                  }
+              }
+              setIsVersionsModalOpen(false);
+          } else {
+              alert('Failed to restore version.');
+          }
+      } catch (e) {
+          console.error(e);
+          alert('Error restoring version.');
+      }
   };
 
   // Rule Management
@@ -152,10 +232,10 @@ export default function RulesPage() {
     const newRules = selectedRuleSet.rules.filter(r => r.id !== id);
     setSelectedRuleSet({ ...selectedRuleSet, rules: newRules });
   };
-  
+
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination || !selectedRuleSet) return;
-    
+
     const items = Array.from(selectedRuleSet.rules);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
@@ -169,14 +249,14 @@ export default function RulesPage() {
   // Execution
   const handleDeployAndExecute = async () => {
     if (!selectedRuleSet) return;
-    
+
     // 1. Reload Rules (Send RuleSet now)
     const loadRes = await fetch(`${getSpaceApiUrl('rules')}/reload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(selectedRuleSet)
     });
-    
+
     if (!loadRes.ok) {
         setExecResult('Failed to load rules: ' + await loadRes.text());
         return;
@@ -207,11 +287,11 @@ export default function RulesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <RuleSetList 
-            ruleSets={ruleSets} 
-            selectedRuleSet={selectedRuleSet} 
-            onSelect={handleEditRuleSet} 
-            onDelete={handleDeleteRuleSet} 
+        <RuleSetList
+            ruleSets={ruleSets}
+            selectedRuleSet={selectedRuleSet}
+            onSelect={handleEditRuleSet}
+            onDelete={handleDeleteRuleSet}
         />
 
         {/* Editor Column */}
@@ -225,28 +305,44 @@ export default function RulesPage() {
                     </h2>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white">Cancel</button>
-                    <button onClick={handleSaveRuleSet} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded">Save Set</button>
+                    <button onClick={handleSnapshot} className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded font-semibold" title="Create a version tag">Snapshot</button>
+                    <button onClick={handleShowVersions} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded font-semibold" title="View version history">Versions</button>
+                    <button onClick={() => setIsEditing(false)} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white">Close</button>
+                    <button
+                        onClick={handleSaveRuleSet}
+                        disabled={saveStatus !== 'idle'}
+                        className={`font-semibold py-2 px-6 rounded flex items-center justify-center gap-2 transition-all min-w-[130px] ${
+                            saveStatus === 'saved' 
+                                ? 'bg-green-600 text-white' 
+                                : saveStatus === 'saving'
+                                    ? 'bg-blue-400 text-white cursor-wait'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                        }`}
+                    >
+                        {saveStatus === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {saveStatus === 'saved' && <Check className="w-4 h-4" />}
+                        {saveStatus === 'saved' ? 'Saved!' : saveStatus === 'saving' ? 'Saving...' : 'Save Set'}
+                    </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</label>
-                    <input type="text" value={selectedRuleSet.name} 
+                    <input type="text" value={selectedRuleSet.name}
                            onChange={e => setSelectedRuleSet({...selectedRuleSet, name: e.target.value})}
                            className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 dark:bg-slate-950 dark:text-slate-100" placeholder="Rule Set Name" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                    <input type="text" value={selectedRuleSet.description} 
+                    <input type="text" value={selectedRuleSet.description}
                            onChange={e => setSelectedRuleSet({...selectedRuleSet, description: e.target.value})}
                            className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 dark:bg-slate-950 dark:text-slate-100" placeholder="Description" />
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Run Type</label>
-                    <select 
-                        value={selectedRuleSet.runType} 
+                    <select
+                        value={selectedRuleSet.runType}
                         onChange={e => setSelectedRuleSet({...selectedRuleSet, runType: e.target.value as RuleRunType})}
                         className="w-full border border-slate-300 dark:border-slate-700 rounded px-3 py-2 dark:bg-slate-950 dark:text-slate-100"
                     >
@@ -255,15 +351,15 @@ export default function RulesPage() {
                     </select>
                 </div>
               </div>
-              
+
               {/* Internal Models Selection */}
               <div className="mb-6">
                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Enabled Internal Models (Pre-load Data)</label>
                  <div className="border border-slate-200 dark:border-slate-700 rounded p-3 bg-slate-50 dark:bg-slate-950 grid grid-cols-2 md:grid-cols-4 gap-2">
                     {dataModels.filter(dm => dm.category === DataModelCategory.INTERNAL).map(model => (
                         <label key={model.name} className="flex items-center gap-2 cursor-pointer p-1 hover:bg-slate-100 dark:hover:bg-slate-900 rounded">
-                            <input 
-                                type="checkbox" 
+                            <input
+                                type="checkbox"
                                 checked={selectedRuleSet.internalModels?.includes(model.name) || false}
                                 onChange={(e) => {
                                     const current = selectedRuleSet.internalModels || [];
@@ -291,20 +387,20 @@ export default function RulesPage() {
                         + Add Rule
                     </button>
                 </div>
-                
-                <RuleList 
-                    rules={selectedRuleSet.rules} 
+
+                <RuleList
+                    rules={selectedRuleSet.rules}
                     dataModels={dataModels}
-                    onEdit={handleEditRule} 
-                    onDelete={handleDeleteRule} 
-                    onDragEnd={handleDragEnd} 
+                    onEdit={handleEditRule}
+                    onDelete={handleDeleteRule}
+                    onDragEnd={handleDragEnd}
                 />
 
-                <Simulator 
-                    execParams={execParams} 
-                    setExecParams={setExecParams} 
-                    execResult={execResult} 
-                    onExecute={handleDeployAndExecute} 
+                <Simulator
+                    execParams={execParams}
+                    setExecParams={setExecParams}
+                    execResult={execResult}
+                    onExecute={handleDeployAndExecute}
                 />
               </div>
             </div>
@@ -317,15 +413,45 @@ export default function RulesPage() {
         </div>
       </div>
 
-      <RuleModal 
-        isOpen={isRuleModalOpen}
-        initialRule={editingRule}
-        dataModels={dataModels}
-        enabledInternalModels={selectedRuleSet?.internalModels || []}
-        enums={enums}
-        onClose={() => setIsRuleModalOpen(false)}
-        onSave={handleSaveRule}
-      />
-    </div>
-  );
-}
+            <RuleModal
+
+              isOpen={isRuleModalOpen}
+
+              initialRule={editingRule}
+
+              dataModels={dataModels}
+
+              enabledInternalModels={selectedRuleSet?.internalModels || []}
+
+              enums={enums}
+
+                      onClose={() => setIsRuleModalOpen(false)}
+
+                      onSave={handleSaveRule}
+
+                    />
+
+
+
+                    <VersionsModal
+
+
+
+              isOpen={isVersionsModalOpen}
+
+              versions={versions}
+
+              ruleSetName={selectedRuleSet?.name || ''}
+
+              onClose={() => setIsVersionsModalOpen(false)}
+
+              onRestore={handleRestore}
+
+            />
+
+          </div>
+
+        );
+
+      }
+

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/spaces/{spaceId}/rulesets")
@@ -29,5 +30,20 @@ public class RuleSetController {
     @DeleteMapping("/{name}")
     public void delete(@PathVariable String spaceId, @PathVariable String name) {
         ruleSetService.deleteRuleSet(spaceId, name);
+    }
+
+    @PostMapping("/{name}/snapshot")
+    public void snapshot(@PathVariable String spaceId, @PathVariable String name, @RequestParam String tag) {
+        ruleSetService.snapshotRuleSet(spaceId, name, tag);
+    }
+
+    @GetMapping("/{name}/versions")
+    public List<Map<String, String>> getVersions(@PathVariable String spaceId, @PathVariable String name) {
+        return ruleSetService.getRuleSetVersions(spaceId, name);
+    }
+
+    @PostMapping("/{name}/restore")
+    public void restore(@PathVariable String spaceId, @PathVariable String name, @RequestParam String version) {
+        ruleSetService.restoreRuleSetVersion(spaceId, name, version);
     }
 }
