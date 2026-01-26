@@ -1,3 +1,6 @@
+server:
+  port: 8085
+
 app:
   storage:
     base-dir: ${java.io.tmpdir}/simple-rule-engine

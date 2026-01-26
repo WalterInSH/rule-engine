@@ -13,8 +13,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -27,7 +33,7 @@ public class RuleSetService {
     public RuleSetService(@Value("${app.storage.base-dir}") String baseDir) {
         this.BASE_DIR = baseDir;
     }
-
+    
     @PostConstruct
     public void init() {
         // Migration logic: Move legacy rulesets to default space
@@ -52,8 +58,6 @@ public class RuleSetService {
                              }
                          });
                 }
-                // Optional: remove legacy dir if empty
-                // Files.deleteIfExists(legacyDir);
             } catch (IOException e) {
                 log.error("Migration failed", e);
             }
@@ -62,6 +66,14 @@ public class RuleSetService {
 
     private Path getStoragePath(String spaceId) {
         return Paths.get(BASE_DIR, "spaces", spaceId, "rulesets");
+    }
+
+    private Path getSnapshotPath(String spaceId, String ruleSetName) {
+        return Paths.get(BASE_DIR, "spaces", spaceId, "snapshots", ruleSetName);
+    }
+    
+    private Path getProductionPath(String spaceId) {
+        return Paths.get(BASE_DIR, "spaces", spaceId, "production");
     }
 
     public List<RuleSet> getAllRuleSets(String spaceId) {
@@ -105,6 +117,81 @@ public class RuleSetService {
         }
     }
 
+    public void snapshotRuleSet(String spaceId, String ruleSetName, String tag) {
+        Path currentPath = getStoragePath(spaceId).resolve(ruleSetName + ".json");
+        if (!Files.exists(currentPath)) {
+            throw new RuntimeException("Rule set not found: " + ruleSetName);
+        }
+
+        Path snapshotDir = getSnapshotPath(spaceId, ruleSetName);
+        try {
+            if (!Files.exists(snapshotDir)) {
+                Files.createDirectories(snapshotDir);
+            }
+            
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = timestamp + "_" + tag + ".json";
+            Path snapshotPath = snapshotDir.resolve(filename);
+            
+            Files.copy(currentPath, snapshotPath);
+            log.info("Created snapshot {} for rule set {} in space {}", filename, ruleSetName, spaceId);
+        } catch (IOException e) {
+            log.error("Failed to create snapshot for rule set: " + ruleSetName, e);
+            throw new RuntimeException("Failed to create snapshot", e);
+        }
+    }
+
+    public List<Map<String, String>> getRuleSetVersions(String spaceId, String ruleSetName) {
+        Path snapshotDir = getSnapshotPath(spaceId, ruleSetName);
+        if (!Files.exists(snapshotDir)) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, String>> versions = new ArrayList<>();
+        try (Stream<Path> paths = Files.list(snapshotDir)) {
+            paths.filter(Files::isRegularFile)
+                 .filter(p -> p.toString().endsWith(".json"))
+                 .forEach(p -> {
+                     String filename = p.getFileName().toString();
+                     // Expected format: yyyyMMdd_HHmmss_tag.json
+                     Map<String, String> info = new HashMap<>();
+                     info.put("filename", filename);
+                     
+                     String nameWithoutExt = filename.substring(0, filename.length() - 5);
+                     String[] parts = nameWithoutExt.split("_", 3);
+                     if (parts.length >= 3) {
+                         info.put("date", parts[0]);
+                         info.put("time", parts[1]);
+                         info.put("tag", parts[2]);
+                     } else {
+                         info.put("tag", nameWithoutExt);
+                     }
+                     versions.add(info);
+                 });
+        } catch (IOException e) {
+            log.error("Failed to list snapshots for rule set: " + ruleSetName, e);
+        }
+        
+        versions.sort((a, b) -> b.get("filename").compareTo(a.get("filename")));
+        return versions;
+    }
+
+    public void restoreRuleSetVersion(String spaceId, String ruleSetName, String versionFilename) {
+        Path snapshotPath = getSnapshotPath(spaceId, ruleSetName).resolve(versionFilename);
+        if (!Files.exists(snapshotPath)) {
+            throw new RuntimeException("Snapshot not found: " + versionFilename);
+        }
+        
+        Path targetPath = getStoragePath(spaceId).resolve(ruleSetName + ".json");
+        try {
+            Files.copy(snapshotPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            log.info("Restored rule set {} from snapshot {} in space {}", ruleSetName, versionFilename, spaceId);
+        } catch (IOException e) {
+            log.error("Failed to restore rule set: " + ruleSetName, e);
+            throw new RuntimeException("Failed to restore rule set", e);
+        }
+    }
+
     public void deleteRuleSet(String spaceId, String name) {
         Path path = getStoragePath(spaceId).resolve(name + ".json");
         try {
@@ -114,6 +201,66 @@ public class RuleSetService {
             log.error("Failed to delete rule set: " + name, e);
             throw new RuntimeException("Failed to delete rule set", e);
         }
+    }
+
+    // Production Deployment Methods
+
+    public void deploySnapshotToProduction(String spaceId, String ruleSetName, String snapshotFilename, String tag) {
+        Path snapshotPath = getSnapshotPath(spaceId, ruleSetName).resolve(snapshotFilename);
+        if (!Files.exists(snapshotPath)) {
+            throw new RuntimeException("Snapshot not found: " + snapshotFilename);
+        }
+
+        Path prodDir = getProductionPath(spaceId);
+        try {
+            if (!Files.exists(prodDir)) {
+                Files.createDirectories(prodDir);
+            }
+
+            // 1. Copy to active_ruleset.json
+            Path activeRuleSetPath = prodDir.resolve("active_ruleset.json");
+            Files.copy(snapshotPath, activeRuleSetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 2. Update config.json
+            Map<String, String> config = new HashMap<>();
+            config.put("ruleSet", ruleSetName);
+            config.put("version", snapshotFilename);
+            if (tag != null) {
+                config.put("tag", tag);
+            }
+            config.put("deployedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            
+            Path configPath = prodDir.resolve("config.json");
+            Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
+            
+            log.info("Deployed snapshot {} (tag: {}) of {} to production in space {}", snapshotFilename, tag, ruleSetName, spaceId);
+
+        } catch (IOException e) {
+            log.error("Failed to deploy to production", e);
+            throw new RuntimeException("Failed to deploy to production", e);
+        }
+    }
+
+    public Map<String, Object> getProductionConfig(String spaceId) {
+        Path configPath = getProductionPath(spaceId).resolve("config.json");
+        if (!Files.exists(configPath)) {
+            return null;
+        }
+        try {
+            String content = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
+            return JSON.parseObject(content, Map.class);
+        } catch (IOException e) {
+            log.error("Failed to read production config", e);
+            return null;
+        }
+    }
+
+    public RuleSet readProductionRuleSet(String spaceId) {
+        Path path = getProductionPath(spaceId).resolve("active_ruleset.json");
+        if (!Files.exists(path)) {
+            return null;
+        }
+        return readRuleSet(path);
     }
 
     private RuleSet readRuleSet(Path path) {

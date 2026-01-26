@@ -1,6 +1,6 @@
 import { getCurrentSpaceId } from './spaceManager';
 
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = 'http://localhost:8085/api';
 
 export const getBaseUrl = () => BASE_URL;
 

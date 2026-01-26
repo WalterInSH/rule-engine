@@ -10,15 +10,15 @@ import java.util.Set;
 public class SimpleRuleBuilder {
     public static final String PACKAGE_NAME = "com.demo.rules";
 
-    public static String buildJavaSource(Rule rule, com.demo.common.RuleRunType runType) {
+    public static String buildJavaSource(Rule rule, com.demo.common.RuleRunType runType, String env) {
         // Ensure class name is valid
-        String className = "Rule_" + rule.getId();
+        String className = "Rule_" + rule.getId() + "_" + env;
         JClass jClass = new JClass(className);
         jClass.setImplement(new String[]{RunTimeRule.class.getName()});
         
         // Header
         Set<String> imports = Sets.newTreeSet();
-        imports.add("com.alibaba.fastjson.JSONObject");
+        imports.add("com.demo.engine.RuleContext");
         imports.add("com.demo.engine.RunTimeRule");
         imports.add("com.demo.common.RuleActionType");
         imports.add("com.demo.common.RuleRunType");
@@ -31,7 +31,7 @@ public class SimpleRuleBuilder {
         jClass.addMethod(new JMethod("getRunType", null, "RuleRunType", "return RuleRunType." + runType + ";", null, null));
 
         // isFired
-        List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "JSONObject"));
+        List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "RuleContext"));
         List<String> exceptions = Collections.singletonList("Exception");
         
         jClass.addMethod(new JMethod("isFired", null, "boolean", "return " + rule.getCondition() + ";", params, exceptions));

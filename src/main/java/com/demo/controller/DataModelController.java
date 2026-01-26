@@ -10,7 +10,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/spaces/{spaceId}/datamodels")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000") // Allow frontend access
 public class DataModelController {
 
     private final DataModelService dataModelService;

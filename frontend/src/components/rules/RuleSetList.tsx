@@ -75,9 +75,9 @@ export default function RuleSetList({ ruleSets, selectedRuleSet, onSelect, onDel
                           {rs.name}
                         </h3>
                         {rs.runType === RuleRunType.ASYNC ? (
-                            <Clock size={12} className="text-amber-500" title="Async" />
+                            <span title="Async"><Clock size={12} className="text-amber-500" /></span>
                         ) : (
-                            <Zap size={12} className="text-green-500" title="Sync" />
+                            <span title="Sync"><Zap size={12} className="text-green-500" /></span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">

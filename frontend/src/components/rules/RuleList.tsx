@@ -53,8 +53,8 @@ export default function RuleList({ rules, dataModels, onEdit, onDelete, onDragEn
   };
 
   const getActionDescription = (action: string) => {
-    // Parse all params.put("key", value);
-    const regex = /params\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+    // Parse all params.put("key", value) or params.getOutput().put("key", value);
+    const regex = /params(?:\.getOutput\(\))?\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
     const actions: string[] = [];
     
     let match;
@@ -75,8 +75,6 @@ export default function RuleList({ rules, dataModels, onEdit, onDelete, onDragEn
 
         if (model) {
             actions.push(`${model.name}.${key} = ${val}`);
-        } else {
-            actions.push(`${key} = ${val}`);
         }
     }
 

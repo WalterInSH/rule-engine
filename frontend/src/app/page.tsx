@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getSpaceApiUrl } from '@/utils/apiConfig';
-import { motion } from 'framer-motion';
-import { Database, FolderPlus, Zap } from 'lucide-react';
+import {useEffect, useState} from 'react';
+import {getSpaceApiUrl} from '@/utils/apiConfig';
+import {motion} from 'framer-motion';
+import {Database, FileText, FolderPlus, Server, Zap} from 'lucide-react';
 
 export default function Home() {
   const [modelCount, setModelCount] = useState<number | null>(null);
@@ -35,7 +35,7 @@ export default function Home() {
         const models = await modelsRes.json();
         setModelCount(models.length);
       }
-      
+
       if (ruleSetsRes.ok) {
         const ruleSets = await ruleSetsRes.json();
         setRuleSetCount(ruleSets.length);
@@ -65,12 +65,24 @@ export default function Home() {
       description: "Build powerful logical rules using the visual editor and test them instantly.",
       icon: Zap,
       color: "bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+    },
+    {
+      title: "4. Deploy",
+      description: "Promote your tested rule sets to the production environment for live execution.",
+      icon: Server,
+      color: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+    },
+    {
+      title: "5. Audit Logs",
+      description: "Monitor execution history and detailed logs to audit performance and outcomes.",
+      icon: FileText,
+      color: "bg-slate-100 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400"
     }
   ];
 
   return (
     <div className="container mx-auto py-10 px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -82,7 +94,7 @@ export default function Home() {
       </motion.div>
 
       <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
@@ -97,7 +109,7 @@ export default function Home() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Defined Models</p>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
@@ -113,19 +125,19 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
         className="mt-20"
       >
         <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-10 text-center">Workflow</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative">
           {/* Connecting Line (Desktop) */}
-          <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-slate-200 dark:bg-slate-800 -z-10"></div>
+          <div className="hidden md:block absolute top-12 left-[10%] right-[10%] h-0.5 bg-slate-200 dark:bg-slate-800 -z-10"></div>
 
           {steps.map((step, index) => (
-            <motion.div 
+            <motion.div
               key={index}
               whileHover={{ y: -5 }}
               className="flex flex-col items-center text-center group"
