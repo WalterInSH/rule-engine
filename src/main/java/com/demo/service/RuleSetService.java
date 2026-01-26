@@ -205,7 +205,7 @@ public class RuleSetService {
 
     // Production Deployment Methods
 
-    public void deploySnapshotToProduction(String spaceId, String ruleSetName, String snapshotFilename) {
+    public void deploySnapshotToProduction(String spaceId, String ruleSetName, String snapshotFilename, String tag) {
         Path snapshotPath = getSnapshotPath(spaceId, ruleSetName).resolve(snapshotFilename);
         if (!Files.exists(snapshotPath)) {
             throw new RuntimeException("Snapshot not found: " + snapshotFilename);
@@ -225,12 +225,15 @@ public class RuleSetService {
             Map<String, String> config = new HashMap<>();
             config.put("ruleSet", ruleSetName);
             config.put("version", snapshotFilename);
+            if (tag != null) {
+                config.put("tag", tag);
+            }
             config.put("deployedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
             
             Path configPath = prodDir.resolve("config.json");
             Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
             
-            log.info("Deployed snapshot {} of {} to production in space {}", snapshotFilename, ruleSetName, spaceId);
+            log.info("Deployed snapshot {} (tag: {}) of {} to production in space {}", snapshotFilename, tag, ruleSetName, spaceId);
 
         } catch (IOException e) {
             log.error("Failed to deploy to production", e);

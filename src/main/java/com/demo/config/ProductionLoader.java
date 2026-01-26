@@ -28,6 +28,14 @@ public class ProductionLoader implements ApplicationRunner {
             try {
                 RuleSet prodRuleSet = ruleSetService.readProductionRuleSet(space.getId());
                 if (prodRuleSet != null) {
+                    java.util.Map<String, Object> config = ruleSetService.getProductionConfig(space.getId());
+                    if (config != null) {
+                        if (config.containsKey("tag")) {
+                            prodRuleSet.setVersion((String) config.get("tag"));
+                        } else if (config.containsKey("version")) {
+                            prodRuleSet.setVersion((String) config.get("version"));
+                        }
+                    }
                     ruleEngine.loadRules(space.getId(), prodRuleSet, "production");
                     log.info("Loaded production rules for space: {}", space.getName());
                 } else {

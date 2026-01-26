@@ -23,17 +23,21 @@ public class ProductionController {
     public ResponseEntity<?> deploy(
             @PathVariable String spaceId,
             @RequestParam String ruleSetName,
-            @RequestParam String version) {
+            @RequestParam String version,
+            @RequestParam(required = false) String tag) {
         
         try {
             // 1. Persist deployment
-            ruleSetService.deploySnapshotToProduction(spaceId, ruleSetName, version);
+            ruleSetService.deploySnapshotToProduction(spaceId, ruleSetName, version, tag);
             
             // 2. Load into Engine
             RuleSet prodRuleSet = ruleSetService.readProductionRuleSet(spaceId);
             if (prodRuleSet != null) {
+                // Ensure the RuleSet object has the correct version identifier (prefer tag if available)
+                String displayVersion = (tag != null && !tag.isEmpty()) ? tag : version;
+                prodRuleSet.setVersion(displayVersion);
                 ruleEngine.loadRules(spaceId, prodRuleSet, "production");
-                return ResponseEntity.ok("Deployed " + version + " to production for space " + spaceId);
+                return ResponseEntity.ok("Deployed " + displayVersion + " to production for space " + spaceId);
             } else {
                 return ResponseEntity.internalServerError().body("Failed to read deployed rule set.");
             }

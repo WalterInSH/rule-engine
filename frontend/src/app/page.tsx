@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getSpaceApiUrl } from '@/utils/apiConfig';
-import { motion } from 'framer-motion';
-import { Database, FolderPlus, Zap } from 'lucide-react';
+import {useEffect, useState} from 'react';
+import {getSpaceApiUrl} from '@/utils/apiConfig';
+import {motion} from 'framer-motion';
+import {Database, FolderPlus, Zap} from 'lucide-react';
 
 export default function Home() {
   const [modelCount, setModelCount] = useState<number | null>(null);
@@ -35,7 +35,7 @@ export default function Home() {
         const models = await modelsRes.json();
         setModelCount(models.length);
       }
-      
+
       if (ruleSetsRes.ok) {
         const ruleSets = await ruleSetsRes.json();
         setRuleSetCount(ruleSets.length);
@@ -70,7 +70,7 @@ export default function Home() {
 
   return (
     <div className="container mx-auto py-10 px-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -82,7 +82,7 @@ export default function Home() {
       </motion.div>
 
       <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2 }}
@@ -97,7 +97,7 @@ export default function Home() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Defined Models</p>
         </motion.div>
 
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
@@ -113,7 +113,7 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
@@ -125,7 +125,7 @@ export default function Home() {
           <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-0.5 bg-slate-200 dark:bg-slate-800 -z-10"></div>
 
           {steps.map((step, index) => (
-            <motion.div 
+            <motion.div
               key={index}
               whileHover={{ y: -5 }}
               className="flex flex-col items-center text-center group"

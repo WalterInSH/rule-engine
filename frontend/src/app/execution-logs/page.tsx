@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getSpaceApiUrl } from '@/utils/apiConfig';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Clock, Timer, Hash, FileText } from 'lucide-react';
-import { motion } from 'framer-motion';
+import {useEffect, useState} from 'react';
+import {getSpaceApiUrl} from '@/utils/apiConfig';
+import {format} from 'date-fns';
+import {Calendar as CalendarIcon, Clock, FileText, Hash, Timer} from 'lucide-react';
+import {motion} from 'framer-motion';
 
 interface ExecutionLog {
     fileName: string;
@@ -57,11 +57,11 @@ export default function ExecutionLogsPage() {
                         View history of rule executions.
                     </p>
                 </div>
-                
+
                 <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
                     <CalendarIcon className="text-slate-400" size={20} />
-                    <input 
-                        type="date" 
+                    <input
+                        type="date"
                         value={selectedDate}
                         onChange={(e) => setSelectedDate(e.target.value)}
                         className="bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-200 font-mono"
@@ -87,12 +87,25 @@ export default function ExecutionLogsPage() {
                                     <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wider text-slate-500 font-semibold">
                                         <th className="px-6 py-4">Start Time</th>
                                         <th className="px-6 py-4">Duration</th>
-                                        <th className="px-6 py-4">Rule Version</th>
+                                        <th className="px-6 py-4">Rule Set Version</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {logs.map((log, index) => (
-                                        <motion.tr 
+                                    {logs.map((log, index) => {
+                                        // Extract tag from filename: yyyyMMdd_HHmmss_tag.json
+                                        let displayVersion = log.version;
+                                        try {
+                                            const name = displayVersion.replace(/\.json$/, '');
+                                            const parts = name.split('_');
+                                            if (parts.length >= 3) {
+                                                displayVersion = parts.slice(2).join('_');
+                                            }
+                                        } catch (e) {
+                                            // keep original if parse fails
+                                        }
+
+                                        return (
+                                        <motion.tr
                                             key={log.fileName}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
@@ -114,11 +127,11 @@ export default function ExecutionLogsPage() {
                                             <td className="px-6 py-4">
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-xs font-medium font-mono border border-blue-100 dark:border-blue-900/30">
                                                     <Hash size={12} />
-                                                    {log.version}
+                                                    {displayVersion}
                                                 </span>
                                             </td>
                                         </motion.tr>
-                                    ))}
+                                    )})}
                                 </tbody>
                             </table>
                         </div>

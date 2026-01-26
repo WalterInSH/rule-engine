@@ -1,6 +1,6 @@
 'use client';
 
-import {useState, useEffect} from 'react';
+import {useEffect, useState} from 'react';
 
 import {RuleSet} from '@/types/RuleSet';
 import {Rule, RuleActionType, RuleRunType} from '@/types/Rule';
@@ -9,7 +9,7 @@ import {DropResult} from '@hello-pangea/dnd';
 
 import RuleSetList from '@/components/rules/RuleSetList';
 import RuleModal from '@/components/rules/RuleModal';
-import VersionsModal, { VersionInfo } from '@/components/rules/VersionsModal';
+import VersionsModal, {VersionInfo} from '@/components/rules/VersionsModal';
 import SnapshotModal from '@/components/rules/SnapshotModal';
 import RuleSetEditor from '@/components/rules/RuleSetEditor';
 import NotificationToast from '@/components/rules/NotificationToast';
@@ -198,7 +198,7 @@ export default function RulesPage() {
             showNotification('Error restoring version.', 'error');
         }
     };
-    
+
     // Rule Management
     const handleAddRule = () => {
         setEditingRule({

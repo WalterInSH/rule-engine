@@ -1,21 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getSpaceApiUrl } from '@/utils/apiConfig';
-import { RuleSet } from '@/types/RuleSet';
-import { format } from 'date-fns';
-import {
-    Server,
-    ShieldCheck,
-    AlertCircle,
-    CheckCircle2,
-    History,
-    Rocket,
-    ChevronRight,
-    Calendar,
-    Box
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import {useEffect, useState} from 'react';
+import {getSpaceApiUrl} from '@/utils/apiConfig';
+import {RuleSet} from '@/types/RuleSet';
+import {AlertCircle, Calendar, CheckCircle2, ChevronRight, History, Rocket, Server, ShieldCheck} from 'lucide-react';
+import {motion} from 'framer-motion';
 import NotificationToast from '@/components/rules/NotificationToast';
 import ConfirmationModal from '@/components/ConfirmationModal';
 
@@ -125,9 +114,9 @@ export default function ProductionPage() {
         setDeployingVersion(version.filename);
 
         try {
-            // POST /api/spaces/{spaceId}/production/deploy?ruleSetName=...&version=...
+            // POST /api/spaces/{spaceId}/production/deploy?ruleSetName=...&version=...&tag=...
             const res = await fetch(
-                `${getSpaceApiUrl('production')}/deploy?ruleSetName=${encodeURIComponent(ruleSet)}&version=${encodeURIComponent(version.filename)}`,
+                `${getSpaceApiUrl('production')}/deploy?ruleSetName=${encodeURIComponent(ruleSet)}&version=${encodeURIComponent(version.filename)}&tag=${encodeURIComponent(version.tag)}`,
                 { method: 'POST' }
             );
 

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Space } from '@/types/Space';
-import { fetchSpaces, createSpace, deleteSpace } from '@/utils/spaceManager';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Box, LayoutGrid, X, Save, Fingerprint } from 'lucide-react';
+import {useEffect, useState} from 'react';
+import {Space} from '@/types/Space';
+import {createSpace, deleteSpace, fetchSpaces} from '@/utils/spaceManager';
+import {AnimatePresence, motion} from 'framer-motion';
+import {Box, Fingerprint, LayoutGrid, Plus, Save, Trash2, X} from 'lucide-react';
 
 export default function SpacesPage() {
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -22,7 +22,7 @@ export default function SpacesPage() {
 
   const handleCreate = async () => {
     if (!newSpace.name) return;
-    
+
     // Auto-generate ID if empty from name
     const spaceToSave = { ...newSpace };
     if (!spaceToSave.id) {
@@ -157,7 +157,7 @@ export default function SpacesPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            key={space.id} 
+            key={space.id}
             className="group bg-white dark:bg-slate-900 shadow-lg hover:shadow-xl rounded-2xl p-6 border border-slate-200 dark:border-slate-800 relative transition-all duration-300 hover:-translate-y-1"
           >
             <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -171,7 +171,7 @@ export default function SpacesPage() {
                 </button>
                )}
             </div>
-            
+
             <div className="flex items-start justify-between mb-4">
                <div className={`p-3 rounded-xl ${space.id === 'default' ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                  <Box size={24} />
@@ -187,13 +187,13 @@ export default function SpacesPage() {
             <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 mb-4 bg-slate-50 dark:bg-slate-950 w-fit px-2 py-1 rounded border border-slate-100 dark:border-slate-800">
                <Fingerprint size={12} /> {space.id}
             </div>
-            
+
             <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed line-clamp-3">
                {space.description || <span className="italic text-slate-400">No description provided.</span>}
             </p>
           </motion.div>
         ))}
-        
+
         {spaces.length === 0 && !isCreating && (
             <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
                 <Box size={48} className="mb-4 opacity-20" />
