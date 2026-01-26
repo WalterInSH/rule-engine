@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface VersionInfo {
   filename: string;
@@ -16,6 +16,8 @@ interface VersionsModalProps {
 }
 
 export default function VersionsModal({ isOpen, versions, ruleSetName, onClose, onRestore }: VersionsModalProps) {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   return (
@@ -45,16 +47,29 @@ export default function VersionsModal({ isOpen, versions, ruleSetName, onClose, 
                                 <td className="px-4 py-3">{v.date}</td>
                                 <td className="px-4 py-3 text-slate-500">{v.time}</td>
                                 <td className="px-4 py-3 text-right">
-                                    <button 
-                                        onClick={() => {
-                                            if (confirm(`Are you sure you want to restore version "${v.tag}"? Current unsaved changes might be lost.`)) {
-                                                onRestore(v.filename);
-                                            }
-                                        }}
-                                        className="text-xs bg-amber-100 hover:bg-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-800 dark:text-amber-100 px-3 py-1 rounded border border-amber-300 dark:border-amber-700"
-                                    >
-                                        Restore
-                                    </button>
+                                    {confirmingId === v.filename ? (
+                                        <div className="flex justify-end gap-2">
+                                            <button 
+                                                onClick={() => setConfirmingId(null)}
+                                                className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 px-2 py-1"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={() => onRestore(v.filename)}
+                                                className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded shadow-sm transition-colors"
+                                            >
+                                                Confirm
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button 
+                                            onClick={() => setConfirmingId(v.filename)}
+                                            className="text-xs bg-amber-100 hover:bg-amber-200 dark:bg-amber-900 dark:hover:bg-amber-800 text-amber-800 dark:text-amber-100 px-3 py-1 rounded border border-amber-300 dark:border-amber-700 transition-colors"
+                                        >
+                                            Restore
+                                        </button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
