@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -33,8 +34,6 @@ public class RuleSetService {
         this.BASE_DIR = baseDir;
     }
     
-    // ... existing code ...
-
     @PostConstruct
     public void init() {
         // Migration logic: Move legacy rulesets to default space
@@ -59,8 +58,6 @@ public class RuleSetService {
                              }
                          });
                 }
-                // Optional: remove legacy dir if empty
-                // Files.deleteIfExists(legacyDir);
             } catch (IOException e) {
                 log.error("Migration failed", e);
             }
@@ -73,6 +70,10 @@ public class RuleSetService {
 
     private Path getSnapshotPath(String spaceId, String ruleSetName) {
         return Paths.get(BASE_DIR, "spaces", spaceId, "snapshots", ruleSetName);
+    }
+    
+    private Path getProductionPath(String spaceId) {
+        return Paths.get(BASE_DIR, "spaces", spaceId, "production");
     }
 
     public List<RuleSet> getAllRuleSets(String spaceId) {
@@ -153,7 +154,6 @@ public class RuleSetService {
                  .forEach(p -> {
                      String filename = p.getFileName().toString();
                      // Expected format: yyyyMMdd_HHmmss_tag.json
-                     // Simple parsing
                      Map<String, String> info = new HashMap<>();
                      info.put("filename", filename);
                      
@@ -172,7 +172,6 @@ public class RuleSetService {
             log.error("Failed to list snapshots for rule set: " + ruleSetName, e);
         }
         
-        // Sort by filename descending (newest first)
         versions.sort((a, b) -> b.get("filename").compareTo(a.get("filename")));
         return versions;
     }
@@ -185,7 +184,6 @@ public class RuleSetService {
         
         Path targetPath = getStoragePath(spaceId).resolve(ruleSetName + ".json");
         try {
-            // Backup current before restore? Maybe too complex for now. The user can snapshot before restore.
             Files.copy(snapshotPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             log.info("Restored rule set {} from snapshot {} in space {}", ruleSetName, versionFilename, spaceId);
         } catch (IOException e) {
@@ -203,6 +201,63 @@ public class RuleSetService {
             log.error("Failed to delete rule set: " + name, e);
             throw new RuntimeException("Failed to delete rule set", e);
         }
+    }
+
+    // Production Deployment Methods
+
+    public void deploySnapshotToProduction(String spaceId, String ruleSetName, String snapshotFilename) {
+        Path snapshotPath = getSnapshotPath(spaceId, ruleSetName).resolve(snapshotFilename);
+        if (!Files.exists(snapshotPath)) {
+            throw new RuntimeException("Snapshot not found: " + snapshotFilename);
+        }
+
+        Path prodDir = getProductionPath(spaceId);
+        try {
+            if (!Files.exists(prodDir)) {
+                Files.createDirectories(prodDir);
+            }
+
+            // 1. Copy to active_ruleset.json
+            Path activeRuleSetPath = prodDir.resolve("active_ruleset.json");
+            Files.copy(snapshotPath, activeRuleSetPath, StandardCopyOption.REPLACE_EXISTING);
+
+            // 2. Update config.json
+            Map<String, String> config = new HashMap<>();
+            config.put("ruleSet", ruleSetName);
+            config.put("version", snapshotFilename);
+            config.put("deployedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            
+            Path configPath = prodDir.resolve("config.json");
+            Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
+            
+            log.info("Deployed snapshot {} of {} to production in space {}", snapshotFilename, ruleSetName, spaceId);
+
+        } catch (IOException e) {
+            log.error("Failed to deploy to production", e);
+            throw new RuntimeException("Failed to deploy to production", e);
+        }
+    }
+
+    public Map<String, Object> getProductionConfig(String spaceId) {
+        Path configPath = getProductionPath(spaceId).resolve("config.json");
+        if (!Files.exists(configPath)) {
+            return null;
+        }
+        try {
+            String content = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
+            return JSON.parseObject(content, Map.class);
+        } catch (IOException e) {
+            log.error("Failed to read production config", e);
+            return null;
+        }
+    }
+
+    public RuleSet readProductionRuleSet(String spaceId) {
+        Path path = getProductionPath(spaceId).resolve("active_ruleset.json");
+        if (!Files.exists(path)) {
+            return null;
+        }
+        return readRuleSet(path);
     }
 
     private RuleSet readRuleSet(Path path) {

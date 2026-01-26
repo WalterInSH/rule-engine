@@ -42,9 +42,9 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
       // Parse existing action string into ActionItems
       const items: ActionItem[] = [];
       if (initialRule.action) {
-        // Regex to match params.put("key", value);
+        // Regex to match params.put("key", value) or params.getOutput().put("key", value);
         // Supports string values ("val"), numbers (123, 12.3), and booleans (true, false)
-        const regex = /params\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+        const regex = /params(?:\.getOutput\(\))?\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
         let match;
         while ((match = regex.exec(initialRule.action)) !== null) {
             const fieldKey = match[1];
@@ -113,7 +113,7 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
                  valStr = `"${item.value}"`;
              }
 
-             actions.push(`params.put("${item.fieldName}", ${valStr});`);
+             actions.push(`params.getOutput().put("${item.fieldName}", ${valStr});`);
           }
       });
 
@@ -187,7 +187,7 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
                  if (item.isString) shouldQuote = true;
              }
              if (shouldQuote) valStr = `"${item.value}"`;
-             actions.push(`params.put("${item.fieldName}", ${valStr});`);
+             actions.push(`params.getOutput().put("${item.fieldName}", ${valStr});`);
           }
       });
       

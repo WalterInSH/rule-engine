@@ -47,6 +47,12 @@ const Navbar = () => {
               Rules
             </Link>
             <Link
+              href="/production"
+              className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-purple-600 dark:hover:text-purple-400 transition-all"
+            >
+              Production
+            </Link>
+            <Link
               href="/execution-logs"
               className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
             >

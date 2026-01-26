@@ -10,9 +10,9 @@ import java.util.Set;
 public class SimpleRuleBuilder {
     public static final String PACKAGE_NAME = "com.demo.rules";
 
-    public static String buildJavaSource(Rule rule, com.demo.common.RuleRunType runType) {
+    public static String buildJavaSource(Rule rule, com.demo.common.RuleRunType runType, String env) {
         // Ensure class name is valid
-        String className = "Rule_" + rule.getId();
+        String className = "Rule_" + rule.getId() + "_" + env;
         JClass jClass = new JClass(className);
         jClass.setImplement(new String[]{RunTimeRule.class.getName()});
         

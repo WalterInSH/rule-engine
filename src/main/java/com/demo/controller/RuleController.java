@@ -36,7 +36,8 @@ public class RuleController {
             date = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
         }
         
-        File logDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + date);
+        // Log path: execution_logs/{spaceId}/production/{date}
+        File logDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + date);
         if (!logDir.exists() || !logDir.isDirectory()) {
             return java.util.Collections.emptyList();
         }
@@ -63,14 +64,6 @@ public class RuleController {
                     summary.setStartTime(json.getString("_startTime"));
                     summary.setDurationMs(json.getLongValue("_durationMs"));
                 }
-                
-                // Parse version from filename: version_timestamp.json
-                // But version might contain underscores? 
-                // Let's rely on the filename structure created: version + "_" + timestamp + ".json"
-                // Or just read from file content if we saved it? We didn't save version in file content explicitly in previous turn (only implicitly if it was in params).
-                // But wait, the previous turn code:
-                // String version = ruleEngine.getCurrentVersion();
-                // String fileName = version + "_" + timestamp + ".json";
                 
                 String name = f.getName();
                 int lastUnderscore = name.lastIndexOf('_');
@@ -105,9 +98,13 @@ public class RuleController {
     }
 
     @PostMapping("/execute")
-    public com.demo.engine.RuleExecutionResult execute(@PathVariable String spaceId, @RequestBody JSONObject params) {
+    public com.demo.engine.RuleExecutionResult execute(
+            @PathVariable String spaceId, 
+            @RequestBody JSONObject params,
+            @RequestParam(required = false, defaultValue = "dev") String env) {
+        
         long start = System.currentTimeMillis();
-        com.demo.engine.RuleExecutionResult result = ruleEngine.execute(params);
+        com.demo.engine.RuleExecutionResult result = ruleEngine.execute(spaceId, params, env);
         long duration = System.currentTimeMillis() - start;
         
         Date now = new Date(start);
@@ -119,30 +116,36 @@ public class RuleController {
             result.getOutput().put("_durationMs", duration);
         }
         
-        // Log execution to file
-        try {
-            String version = ruleEngine.getCurrentVersion();
-            String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
-            String fileName = version + "_" + timestamp + ".json";
-            
-            File spaceDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + dateStr);
-            if (!spaceDir.exists()) {
-                spaceDir.mkdirs();
+        // Log execution to file only if production
+        if ("production".equalsIgnoreCase(env)) {
+            try {
+                String version = ruleEngine.getCurrentVersion(spaceId, env);
+                String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
+                String fileName = version + "_" + timestamp + ".json";
+                
+                File spaceDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + dateStr);
+                if (!spaceDir.exists()) {
+                    spaceDir.mkdirs();
+                }
+                
+                File logFile = new File(spaceDir, fileName);
+                String jsonContent = JSONObject.toJSONString(result, SerializerFeature.PrettyFormat);
+                Files.write(logFile.toPath(), jsonContent.getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                log.error("Failed to write execution log for space {} env {}", spaceId, env, e);
             }
-            
-            File logFile = new File(spaceDir, fileName);
-            String jsonContent = JSONObject.toJSONString(result, SerializerFeature.PrettyFormat);
-            Files.write(logFile.toPath(), jsonContent.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            log.error("Failed to write execution log for space {}", spaceId, e);
         }
 
         return result;
     }
 
     @PostMapping("/reload")
-    public String reload(@PathVariable String spaceId, @RequestBody com.demo.common.RuleSet ruleSet) {
-        ruleEngine.loadRules(spaceId, ruleSet);
-        return "Loaded " + (ruleSet.getRules() != null ? ruleSet.getRules().size() : 0) + " rules for space " + spaceId;
+    public String reload(
+            @PathVariable String spaceId, 
+            @RequestBody com.demo.common.RuleSet ruleSet,
+            @RequestParam(required = false, defaultValue = "dev") String env) {
+        
+        ruleEngine.loadRules(spaceId, ruleSet, env);
+        return "Loaded " + (ruleSet.getRules() != null ? ruleSet.getRules().size() : 0) + " rules for space " + spaceId + " env " + env;
     }
 }

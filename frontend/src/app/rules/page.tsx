@@ -259,7 +259,7 @@ export default function RulesPage() {
     const handleDeployAndExecute = async () => {
         if (!selectedRuleSet) return;
 
-        const loadRes = await fetch(`${getSpaceApiUrl('rules')}/reload`, {
+        const loadRes = await fetch(`${getSpaceApiUrl('rules')}/reload?env=dev`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify(selectedRuleSet)
@@ -272,7 +272,7 @@ export default function RulesPage() {
 
         try {
             const params = JSON.parse(execParams);
-            const execRes = await fetch(`${getSpaceApiUrl('rules')}/execute`, {
+            const execRes = await fetch(`${getSpaceApiUrl('rules')}/execute?env=dev`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(params)
