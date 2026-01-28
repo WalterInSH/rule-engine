@@ -12,7 +12,7 @@ public class SimpleRuleBuilder {
 
     public static String buildJavaSource(Rule rule, com.demo.common.RuleRunType runType, String env) {
         // Ensure class name is valid
-        String className = "Rule_" + rule.getId() + "_" + env;
+        String className = "Rule_" + rule.getId() + "_" + env.replaceAll("[^a-zA-Z0-9_]", "_");
         JClass jClass = new JClass(className);
         jClass.setImplement(new String[]{RunTimeRule.class.getName()});
         

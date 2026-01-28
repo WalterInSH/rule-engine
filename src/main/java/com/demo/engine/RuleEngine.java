@@ -89,7 +89,7 @@ public class RuleEngine {
                 // 2. Compile
                 Class<? extends RunTimeRule> ruleClass = CompilerUtil.compile(
                         SimpleRuleBuilder.PACKAGE_NAME,
-                        "Rule_" + ruleDef.getId() + "_" + env.replace(":", "_"), // Sanitize env for class name
+                        "Rule_" + ruleDef.getId() + "_" + env.replaceAll("[^a-zA-Z0-9_]", "_"), // Sanitize env for class name
                         javaSource
                 );
 
