@@ -272,4 +272,84 @@ public class RuleSetService {
             return null;
         }
     }
+
+    // A/B Testing Support
+
+    private Path getAbProductionPath(String spaceId) {
+        return getProductionPath(spaceId).resolve("ab");
+    }
+
+    public void deployAbTestPlan(String spaceId, com.demo.common.AbTestConfig config) {
+        Path abDir = getAbProductionPath(spaceId);
+        try {
+            // 1. Clean up existing AB directory
+            if (Files.exists(abDir)) {
+                // simple recursive delete
+                Files.walk(abDir)
+                        .sorted(java.util.Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+            }
+            Files.createDirectories(abDir);
+
+            // 2. Copy variant rule sets
+            for (com.demo.common.AbTestConfig.Variant variant : config.getVariants()) {
+                Path snapshotPath = getSnapshotPath(spaceId, variant.getRuleSetName()).resolve(variant.getVersion());
+                if (!Files.exists(snapshotPath)) {
+                    throw new RuntimeException("Snapshot not found for variant " + variant.getName() + ": " + variant.getVersion());
+                }
+                
+                Path targetPath = abDir.resolve(variant.getId() + ".json");
+                Files.copy(snapshotPath, targetPath);
+            }
+
+            // 3. Save config
+            Path configPath = abDir.resolve("config.json");
+            Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
+            
+            log.info("Deployed A/B test plan to space {}", spaceId);
+
+        } catch (IOException e) {
+            log.error("Failed to deploy A/B test plan", e);
+            throw new RuntimeException("Failed to deploy A/B test plan", e);
+        }
+    }
+
+    public com.demo.common.AbTestConfig getAbTestConfig(String spaceId) {
+        Path configPath = getAbProductionPath(spaceId).resolve("config.json");
+        if (!Files.exists(configPath)) {
+            return null;
+        }
+        try {
+            String content = new String(Files.readAllBytes(configPath), StandardCharsets.UTF_8);
+            return JSON.parseObject(content, com.demo.common.AbTestConfig.class);
+        } catch (IOException e) {
+            log.error("Failed to read A/B test config", e);
+            return null;
+        }
+    }
+
+    public void deleteAbTestPlan(String spaceId) {
+        Path abDir = getAbProductionPath(spaceId);
+        if (Files.exists(abDir)) {
+            try {
+                Files.walk(abDir)
+                        .sorted(java.util.Comparator.reverseOrder())
+                        .map(Path::toFile)
+                        .forEach(File::delete);
+                log.info("Deleted A/B test plan for space {}", spaceId);
+            } catch (IOException e) {
+                log.error("Failed to delete A/B test plan", e);
+                throw new RuntimeException("Failed to delete A/B test plan", e);
+            }
+        }
+    }
+
+    public RuleSet readVariantRuleSet(String spaceId, String variantId) {
+        Path path = getAbProductionPath(spaceId).resolve(variantId + ".json");
+        if (!Files.exists(path)) {
+            return null;
+        }
+        return readRuleSet(path);
+    }
 }

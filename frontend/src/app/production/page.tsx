@@ -3,10 +3,11 @@
 import {useEffect, useState} from 'react';
 import {getSpaceApiUrl} from '@/utils/apiConfig';
 import {RuleSet} from '@/types/RuleSet';
-import {AlertCircle, Calendar, CheckCircle2, ChevronRight, History, Rocket, Server, ShieldCheck} from 'lucide-react';
+import {AlertCircle, Calendar, CheckCircle2, ChevronRight, History, Rocket, Server, ShieldCheck, FlaskConical, Trash2} from 'lucide-react';
 import {motion} from 'framer-motion';
 import NotificationToast from '@/components/rules/NotificationToast';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import AbTestModal from '@/components/rules/AbTestModal';
 
 interface ProductionConfig {
     ruleSet: string;
@@ -21,6 +22,21 @@ interface VersionInfo {
     time: string;
 }
 
+interface AbVariant {
+    id?: string;
+    name: string;
+    ruleSetName: string;
+    version: string;
+    tag: string;
+    weight: number;
+}
+
+interface AbTestConfig {
+    variants: AbVariant[];
+    expiration: string;
+    active: boolean;
+}
+
 export default function ProductionPage() {
     const [ruleSets, setRuleSets] = useState<RuleSet[]>([]);
     const [config, setConfig] = useState<ProductionConfig | null>(null);
@@ -32,6 +48,9 @@ export default function ProductionPage() {
 
     const [deployingVersion, setDeployingVersion] = useState<string | null>(null);
     const [confirmDeploy, setConfirmDeploy] = useState<{version: VersionInfo, ruleSet: string} | null>(null);
+
+    const [abConfig, setAbConfig] = useState<AbTestConfig | null>(null);
+    const [isAbModalOpen, setIsAbModalOpen] = useState(false);
 
     const [notification, setNotification] = useState<{
         message: string,
@@ -63,9 +82,10 @@ export default function ProductionPage() {
     const fetchInitialData = async () => {
         setIsLoadingConfig(true);
         try {
-            const [rsRes, configRes] = await Promise.all([
+            const [rsRes, configRes, abRes] = await Promise.all([
                 fetch(getSpaceApiUrl('rulesets')),
-                fetch(`${getSpaceApiUrl('production')}/status`)
+                fetch(`${getSpaceApiUrl('production')}/status`),
+                fetch(`${getSpaceApiUrl('production')}/ab-test`)
             ]);
 
             if (rsRes.ok) setRuleSets(await rsRes.json());
@@ -76,6 +96,11 @@ export default function ProductionPage() {
                 } else {
                     setConfig(data);
                 }
+            }
+            if (abRes.ok) {
+                setAbConfig(await abRes.json());
+            } else {
+                setAbConfig(null);
             }
         } catch (e) {
             console.error(e);
@@ -114,18 +139,13 @@ export default function ProductionPage() {
         setDeployingVersion(version.filename);
 
         try {
-            // POST /api/spaces/{spaceId}/production/deploy?ruleSetName=...&version=...&tag=...
             const res = await fetch(
                 `${getSpaceApiUrl('production')}/deploy?ruleSetName=${encodeURIComponent(ruleSet)}&version=${encodeURIComponent(version.filename)}&tag=${encodeURIComponent(version.tag)}`,
                 { method: 'POST' }
             );
 
             if (res.ok) {
-                // Refresh Status
-                const configRes = await fetch(`${getSpaceApiUrl('production')}/status`);
-                if (configRes.ok) {
-                    setConfig(await configRes.json());
-                }
+                await fetchInitialData();
                 showNotification('Deployment successful!', 'success');
             } else {
                 showNotification('Deployment failed: ' + await res.text(), 'error');
@@ -138,6 +158,44 @@ export default function ProductionPage() {
         }
     };
 
+    const deployAbTest = async (newConfig: AbTestConfig) => {
+        try {
+            const res = await fetch(`${getSpaceApiUrl('production')}/ab-test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newConfig)
+            });
+
+            if (res.ok) {
+                await fetchInitialData();
+                showNotification('A/B Test Started!', 'success');
+            } else {
+                showNotification('Failed to start A/B test: ' + await res.text(), 'error');
+                throw new Error('Failed');
+            }
+        } catch (e) {
+            console.error(e);
+            throw e;
+        }
+    };
+
+    const stopAbTest = async () => {
+        try {
+            const res = await fetch(`${getSpaceApiUrl('production')}/ab-test`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                setAbConfig(null);
+                showNotification('A/B Test Stopped.', 'success');
+            } else {
+                showNotification('Failed to stop test.', 'error');
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
     return (
         <div className="container mx-auto py-8 px-4">
             <div className="flex items-center gap-3 mb-8">
@@ -146,42 +204,117 @@ export default function ProductionPage() {
             </div>
 
             {/* Status Card */}
-            <div className="mb-8 bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
-                <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-                    <ShieldCheck size={20} className="text-green-500" />
-                    Current Status
-                </h2>
+            <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
+                    <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                        <ShieldCheck size={20} className="text-green-500" />
+                        Current Status
+                    </h2>
 
-                {isLoadingConfig ? (
-                    <div className="animate-pulse h-16 bg-slate-100 dark:bg-slate-800 rounded"></div>
-                ) : config ? (
-                    <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 p-4 rounded-xl">
-                        <div className="flex gap-4 items-center">
-                            <div className="p-3 bg-green-100 dark:bg-green-800/30 rounded-full text-green-600 dark:text-green-400">
-                                <Rocket size={24} />
+                    {isLoadingConfig ? (
+                        <div className="animate-pulse h-16 bg-slate-100 dark:bg-slate-800 rounded"></div>
+                    ) : config ? (
+                        <div className="flex flex-col gap-4">
+                            <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 p-4 rounded-xl">
+                                <div className="flex gap-4 items-center">
+                                    <div className="p-3 bg-green-100 dark:bg-green-800/30 rounded-full text-green-600 dark:text-green-400">
+                                        <Rocket size={24} />
+                                    </div>
+                                    <div>
+                                        <div className="text-sm text-green-800 dark:text-green-300 font-medium mb-1">Active Rule Set</div>
+                                        <div className="text-2xl font-bold text-green-900 dark:text-green-100">{config.ruleSet}</div>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                     <div className="text-xs text-green-700 dark:text-green-400 mb-1">Deployed At</div>
+                                     <div className="text-sm font-mono text-green-800 dark:text-green-300">
+                                         {new Date(config.deployedAt).toLocaleDateString()}<br/>
+                                         {new Date(config.deployedAt).toLocaleTimeString()}
+                                     </div>
+                                </div>
                             </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-xl text-amber-800 dark:text-amber-200">
+                            <AlertCircle size={24} />
                             <div>
-                                <div className="text-sm text-green-800 dark:text-green-300 font-medium mb-1">Active Rule Set</div>
-                                <div className="text-2xl font-bold text-green-900 dark:text-green-100">{config.ruleSet}</div>
+                                <div className="font-bold">No Rules Deployed</div>
+                                <div className="text-sm opacity-80">Deploy a snapshot to enable A/B testing.</div>
                             </div>
                         </div>
+                    )}
+                </div>
 
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400">
-                                <History size={14} />
-                                Deployed: {new Date(config.deployedAt).toLocaleString()}
+                {/* A/B Testing Card */}
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 flex flex-col">
+                     <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
+                        <FlaskConical size={20} className="text-purple-500" />
+                        A/B Testing
+                    </h2>
+
+                    {abConfig && abConfig.active ? (
+                        <div className="flex-1 flex flex-col justify-between">
+                            <div className="space-y-3">
+                                <div className="p-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="font-bold text-purple-900 dark:text-purple-100">Active Experiment</span>
+                                        <span className="text-xs px-2 py-1 bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded-full font-mono">
+                                            Expires: {new Date(abConfig.expiration).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="space-y-2 mt-3">
+                                        {/* Main */}
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="flex items-center gap-2">
+                                                <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                                                Main ({config?.ruleSet})
+                                            </span>
+                                            <span className="font-mono font-bold">
+                                                {100 - abConfig.variants.reduce((sum, v) => sum + v.weight, 0)}%
+                                            </span>
+                                        </div>
+                                        {/* Variants */}
+                                        {abConfig.variants.map((v, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                                                    {v.name} ({v.ruleSetName})
+                                                </span>
+                                                <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                                                    {v.weight}%
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
+                            
+                            <button 
+                                onClick={stopAbTest}
+                                className="mt-4 w-full py-2 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm font-semibold"
+                            >
+                                <Trash2 size={16} /> Stop Experiment
+                            </button>
                         </div>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-xl text-amber-800 dark:text-amber-200">
-                        <AlertCircle size={24} />
-                        <div>
-                            <div className="font-bold">No Rules Deployed</div>
-                            <div className="text-sm opacity-80">The production environment is currently empty. Select a snapshot below to deploy.</div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+                             <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-400 mb-3">
+                                <FlaskConical size={24} />
+                             </div>
+                             <p className="text-sm text-slate-500 mb-4">
+                                 Run experiments by splitting traffic between the main rule set and candidate variants.
+                             </p>
+                             <button
+                                onClick={() => setIsAbModalOpen(true)}
+                                disabled={!config}
+                                className="px-6 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                             >
+                                 Create A/B Plan
+                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-[600px]">
@@ -309,6 +442,14 @@ export default function ProductionPage() {
                 confirmLabel="Deploy Now"
                 onConfirm={executeDeploy}
                 onCancel={() => setConfirmDeploy(null)}
+            />
+
+            <AbTestModal 
+                isOpen={isAbModalOpen}
+                onClose={() => setIsAbModalOpen(false)}
+                onDeploy={deployAbTest}
+                ruleSets={ruleSets}
+                currentMainRuleSet={config?.ruleSet || 'None'}
             />
 
             <NotificationToast notification={notification} />
