@@ -1,6 +1,7 @@
 ### GET request to example server
 POST http://localhost:8085/api/spaces/default/rules/execute?env=production
 Content-Type: application/json
+Authorization: Bearer sk-997dbc16e7b14b8fa5c1a185af1bec745150c946e1
 
 {
   "userId":"123"
