@@ -107,6 +107,11 @@ public class ProductionController {
         return ResponseEntity.ok(config);
     }
 
+    @GetMapping("/ab-test/history")
+    public ResponseEntity<?> getAbTestHistory(@PathVariable String spaceId) {
+        return ResponseEntity.ok(ruleSetService.getAbTestHistory(spaceId));
+    }
+
     @DeleteMapping("/ab-test")
     public ResponseEntity<?> deleteAbTest(@PathVariable String spaceId) {
         try {

@@ -35,6 +35,8 @@ interface AbTestConfig {
     variants: AbVariant[];
     expiration: string;
     active: boolean;
+    startedAt?: string;
+    endedAt?: string;
 }
 
 export default function ProductionPage() {
@@ -50,6 +52,8 @@ export default function ProductionPage() {
     const [confirmDeploy, setConfirmDeploy] = useState<{version: VersionInfo, ruleSet: string} | null>(null);
 
     const [abConfig, setAbConfig] = useState<AbTestConfig | null>(null);
+    const [abHistory, setAbHistory] = useState<AbTestConfig[]>([]);
+    const [showAbHistory, setShowAbHistory] = useState(false);
     const [isAbModalOpen, setIsAbModalOpen] = useState(false);
 
     const [notification, setNotification] = useState<{
@@ -82,10 +86,11 @@ export default function ProductionPage() {
     const fetchInitialData = async () => {
         setIsLoadingConfig(true);
         try {
-            const [rsRes, configRes, abRes] = await Promise.all([
+            const [rsRes, configRes, abRes, abHistoryRes] = await Promise.all([
                 fetch(getSpaceApiUrl('rulesets')),
                 fetch(`${getSpaceApiUrl('production')}/status`),
-                fetch(`${getSpaceApiUrl('production')}/ab-test`)
+                fetch(`${getSpaceApiUrl('production')}/ab-test`),
+                fetch(`${getSpaceApiUrl('production')}/ab-test/history`)
             ]);
 
             if (rsRes.ok) setRuleSets(await rsRes.json());
@@ -101,6 +106,11 @@ export default function ProductionPage() {
                 setAbConfig(await abRes.json());
             } else {
                 setAbConfig(null);
+            }
+            if (abHistoryRes.ok) {
+                setAbHistory(await abHistoryRes.json());
+            } else {
+                setAbHistory([]);
             }
         } catch (e) {
             console.error(e);
@@ -187,6 +197,7 @@ export default function ProductionPage() {
 
             if (res.ok) {
                 setAbConfig(null);
+                await fetchInitialData();
                 showNotification('A/B Test Stopped.', 'success');
             } else {
                 showNotification('Failed to stop test.', 'error');
@@ -246,15 +257,64 @@ export default function ProductionPage() {
                 </div>
 
                 {/* A/B Testing Card */}
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 flex flex-col">
-                     <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2">
-                        <FlaskConical size={20} className="text-purple-500" />
-                        A/B Testing
-                    </h2>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 flex flex-col h-[300px]">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                            <FlaskConical size={20} className="text-purple-500" />
+                            A/B Testing
+                        </h2>
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                            <button
+                                onClick={() => setShowAbHistory(false)}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${!showAbHistory ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                Current
+                            </button>
+                            <button
+                                onClick={() => setShowAbHistory(true)}
+                                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${showAbHistory ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                History
+                            </button>
+                        </div>
+                    </div>
 
-                    {abConfig && abConfig.active ? (
+                    {showAbHistory ? (
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-2">
+                            {abHistory.length === 0 ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                                    <History size={24} className="mb-2 opacity-50" />
+                                    <span className="text-xs">No history available</span>
+                                </div>
+                            ) : (
+                                abHistory.map((h, i) => (
+                                    <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                                {h.startedAt ? new Date(h.startedAt).toLocaleDateString() : 'Unknown'}
+                                            </div>
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-slate-600 dark:text-slate-300">
+                                                Ended: {h.endedAt ? new Date(h.endedAt).toLocaleDateString() : 'Active'}
+                                            </span>
+                                        </div>
+                                        <div className="space-y-1">
+                                            {h.variants.map((v, idx) => (
+                                                <div key={idx} className="flex justify-between items-center text-xs">
+                                                    <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                                                        {v.name}
+                                                    </span>
+                                                    <span className="font-mono text-slate-500">{v.weight}%</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    ) : abConfig && abConfig.active ? (
                         <div className="flex-1 flex flex-col justify-between">
-                            <div className="space-y-3">
+                            <div className="space-y-3 overflow-y-auto custom-scrollbar pr-2">
                                 <div className="p-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-xl">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-bold text-purple-900 dark:text-purple-100">Active Experiment</span>
@@ -401,19 +461,24 @@ export default function ProductionPage() {
 
                                             <button
                                                 onClick={() => initiateDeploy(v)}
-                                                disabled={isCurrent || deployingVersion === v.filename}
+                                                disabled={isCurrent || deployingVersion === v.filename || (abConfig?.active ?? false)}
+                                                title={abConfig?.active ? "Cannot deploy while A/B test is active" : ""}
                                                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 ${
                                                     isCurrent
                                                         ? 'bg-transparent text-green-600 cursor-default'
                                                         : deployingVersion === v.filename
                                                             ? 'bg-slate-100 text-slate-400 cursor-wait'
-                                                            : 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-200 dark:shadow-none'
+                                                            : abConfig?.active
+                                                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                                                : 'bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-200 dark:shadow-none'
                                                 }`}
                                             >
                                                 {isCurrent ? (
                                                     'Deployed'
                                                 ) : deployingVersion === v.filename ? (
                                                     'Deploying...'
+                                                ) : abConfig?.active ? (
+                                                    'A/B Test Active'
                                                 ) : (
                                                     <>
                                                         Deploy <Rocket size={14} />

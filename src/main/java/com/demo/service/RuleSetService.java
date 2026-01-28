@@ -279,6 +279,10 @@ public class RuleSetService {
         return getProductionPath(spaceId).resolve("ab");
     }
 
+    private Path getAbHistoryPath(String spaceId) {
+        return getProductionPath(spaceId).resolve("ab_history");
+    }
+
     public void deployAbTestPlan(String spaceId, com.demo.common.AbTestConfig config) {
         Path abDir = getAbProductionPath(spaceId);
         try {
@@ -304,6 +308,9 @@ public class RuleSetService {
             }
 
             // 3. Save config
+            if (config.getStartedAt() == null) {
+                config.setStartedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            }
             Path configPath = abDir.resolve("config.json");
             Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
             
@@ -329,7 +336,35 @@ public class RuleSetService {
         }
     }
 
+    public void archiveAbTestPlan(String spaceId, com.demo.common.AbTestConfig config) {
+        if (config == null) return;
+        Path historyDir = getAbHistoryPath(spaceId);
+        try {
+            if (!Files.exists(historyDir)) {
+                Files.createDirectories(historyDir);
+            }
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String filename = "ab_" + timestamp + ".json";
+            Path archivePath = historyDir.resolve(filename);
+            
+            Files.write(archivePath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
+            log.info("Archived A/B test plan to {}", filename);
+        } catch (IOException e) {
+             log.error("Failed to archive A/B test plan", e);
+        }
+    }
+
     public void deleteAbTestPlan(String spaceId) {
+        // Archive first
+        com.demo.common.AbTestConfig current = getAbTestConfig(spaceId);
+        if (current != null) {
+            current.setActive(false);
+            if (current.getEndedAt() == null) {
+                current.setEndedAt(LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            }
+            archiveAbTestPlan(spaceId, current);
+        }
+
         Path abDir = getAbProductionPath(spaceId);
         if (Files.exists(abDir)) {
             try {
@@ -343,6 +378,34 @@ public class RuleSetService {
                 throw new RuntimeException("Failed to delete A/B test plan", e);
             }
         }
+    }
+
+    public List<com.demo.common.AbTestConfig> getAbTestHistory(String spaceId) {
+        Path historyDir = getAbHistoryPath(spaceId);
+        if (!Files.exists(historyDir)) return Collections.emptyList();
+        
+        List<com.demo.common.AbTestConfig> history = new ArrayList<>();
+        try (Stream<Path> paths = Files.list(historyDir)) {
+            paths.filter(Files::isRegularFile)
+                 .filter(p -> p.toString().endsWith(".json"))
+                 .forEach(p -> {
+                     try {
+                         String content = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+                         history.add(JSON.parseObject(content, com.demo.common.AbTestConfig.class));
+                     } catch (Exception e) {
+                         log.error("Failed to read history file " + p, e);
+                     }
+                 });
+        } catch (IOException e) {
+            log.error("Failed to list A/B history", e);
+        }
+        // Sort by startedAt desc
+        history.sort((a, b) -> {
+            String t1 = a.getStartedAt() != null ? a.getStartedAt() : "";
+            String t2 = b.getStartedAt() != null ? b.getStartedAt() : "";
+            return t2.compareTo(t1);
+        });
+        return history;
     }
 
     public RuleSet readVariantRuleSet(String spaceId, String variantId) {
