@@ -34,10 +34,10 @@ public class SimpleRuleBuilder {
         List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "RuleContext"));
         List<String> exceptions = Collections.singletonList("Exception");
         
-        jClass.addMethod(new JMethod("isFired", null, "boolean", "return " + rule.getCondition() + ";", params, exceptions));
+        jClass.addMethod(new JMethod("isFired", null, "boolean", "return " + RuleCodeGenerator.generateCondition(rule.getConditionNode()) + ";", params, exceptions));
         
         // executeAction
-        jClass.addMethod(new JMethod("executeAction", null, "void", rule.getAction(), params, exceptions));
+        jClass.addMethod(new JMethod("executeAction", null, "void", RuleCodeGenerator.generateAction(rule.getRuleActions()), params, exceptions));
 
         return jClass.build();
     }

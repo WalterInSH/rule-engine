@@ -25,6 +25,13 @@ export interface ConditionNode {
   condition?: ConditionDefinition;
 }
 
+export interface RuleAction {
+  modelName: string;
+  fieldName: string;
+  value: string;
+  valueType: string;
+}
+
 export interface Rule {
   id: string;
   priority: number;
@@ -32,5 +39,6 @@ export interface Rule {
   condition: string;
   action: string;
   conditionNode?: ConditionNode;
+  ruleActions?: RuleAction[];
   conditions?: ConditionDefinition[]; // Deprecated but kept for type safety during migration if needed
 }

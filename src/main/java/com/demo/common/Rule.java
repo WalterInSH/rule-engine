@@ -11,4 +11,5 @@ public class Rule {
     private String action;
 
     private ConditionNode conditionNode;
+    private java.util.List<RuleAction> ruleActions;
 }
