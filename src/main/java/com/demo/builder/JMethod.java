@@ -2,6 +2,7 @@ package com.demo.builder;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+
 import java.util.List;
 
 public class JMethod extends CodeComposite {
@@ -47,7 +48,7 @@ public class JMethod extends CodeComposite {
         int lastIndexOf = sb.lastIndexOf(COMMA);
         if (lastIndexOf == sb.length() - 2) sb.delete(lastIndexOf, sb.length());
         sb.append(RIGHT_PARENTHESES).append(StringUtils.SPACE);
-        
+
         if (CollectionUtils.isNotEmpty(exceptions)) {
             sb.append("throws").append(StringUtils.SPACE);
             for (String exception : exceptions) {

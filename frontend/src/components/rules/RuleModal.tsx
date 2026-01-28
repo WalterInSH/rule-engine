@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Rule, RuleActionType, ConditionNode } from '@/types/Rule';
+import { Rule, RuleActionType, ConditionNode, RuleAction } from '@/types/Rule';
 import { DataModel, FieldType, DataModelCategory, EnumDefinition } from '@/types/DataModel';
 import ConditionTree from './ConditionTree';
 
@@ -13,12 +13,13 @@ interface RuleModalProps {
   onSave: (rule: Rule) => void;
 }
 
+// Local UI state for actions (includes ID for React rendering)
 interface ActionItem {
   id: string;
   modelName: string;
   fieldName: string;
   value: string;
-  isString?: boolean; // Track if the original value was quoted
+  valueType: string;
 }
 
 export default function RuleModal({ isOpen, initialRule, dataModels, enabledInternalModels, enums, onClose, onSave }: RuleModalProps) {
@@ -39,42 +40,49 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
           conditionNode: initialRule.conditionNode || defaultRoot 
       });
 
-      // Parse existing action string into ActionItems
-      const items: ActionItem[] = [];
-      if (initialRule.action) {
-        // Regex to match params.put("key", value) or params.getOutput().put("key", value);
-        // Supports string values ("val"), numbers (123, 12.3), and booleans (true, false)
-        const regex = /params(?:\.getOutput\(\))?\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
-        let match;
-        while ((match = regex.exec(initialRule.action)) !== null) {
-            const fieldKey = match[1];
-            let val = match[2];
-            let isString = false;
-            
-            // Remove quotes if it's a string value
-            if (val.startsWith('"') && val.endsWith('"')) {
-                val = val.slice(1, -1);
-                isString = true;
-            }
+      // Initialize actions
+      if (initialRule.ruleActions && initialRule.ruleActions.length > 0) {
+          // Use the new structured format
+          setActionItems(initialRule.ruleActions.map(ra => ({
+              id: crypto.randomUUID(),
+              modelName: ra.modelName,
+              fieldName: ra.fieldName,
+              value: ra.value,
+              valueType: ra.valueType
+          })));
+      } else if (initialRule.action) {
+          // Migration support: Parse existing action string into ActionItems
+          const items: ActionItem[] = [];
+          const regex = /params(?:\.getOutput\(\))?\.put\("([^"]+)",\s*((?:"[^"]*")|(?:\d+(?:\.\d+)?)|(?:true|false))\);/g;
+          let match;
+          while ((match = regex.exec(initialRule.action)) !== null) {
+              const fieldKey = match[1];
+              let val = match[2];
+              
+              // Remove quotes if it's a string value
+              if (val.startsWith('"') && val.endsWith('"')) {
+                  val = val.slice(1, -1);
+              }
 
-            // Try to find the model for this field
-            const model = dataModels.find(m => m.category === DataModelCategory.OUTPUT && m.fields.some(f => f.name === fieldKey));
-            
-            items.push({
-                id: crypto.randomUUID(),
-                modelName: model ? model.name : '',
-                fieldName: fieldKey,
-                value: val,
-                isString
-            });
-        }
+              // Try to find the model for this field
+              const model = dataModels.find(m => m.category === DataModelCategory.OUTPUT && m.fields.some(f => f.name === fieldKey));
+              const field = model?.fields.find(f => f.name === fieldKey);
+
+              items.push({
+                  id: crypto.randomUUID(),
+                  modelName: model ? model.name : '',
+                  fieldName: fieldKey,
+                  value: val,
+                  valueType: field ? field.type : 'STRING' // Default to STRING if unknown
+              });
+          }
+          if (items.length === 0) {
+             items.push({ id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', valueType: 'STRING' });
+          }
+          setActionItems(items);
+      } else {
+          setActionItems([]);
       }
-      
-      if (items.length === 0) {
-          items.push({ id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', isString: true });
-      }
-      
-      setActionItems(items);
 
     } else {
         setEditingRule(null);
@@ -82,119 +90,27 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
     }
   }, [initialRule, isOpen, dataModels]);
 
-  // Reconstruct action string whenever actionItems changes
-  useEffect(() => {
-      if (!editingRule) return;
-
-      const actions: string[] = [];
-      
-      actionItems.forEach(item => {
-          // Require fieldName and value. We do NOT require modelName to ensure preservation.
-          if (item.fieldName && item.value !== '') {
-             const model = dataModels.find(m => m.name === item.modelName);
-             const field = model?.fields.find(f => f.name === item.fieldName);
-             
-             let valStr = item.value;
-             let shouldQuote = false;
-
-             if (field) {
-                 // If we found the field, strictly follow its type
-                 if (field.type === FieldType.STRING || field.type === FieldType.ENUM) {
-                     shouldQuote = true;
-                 }
-             } else {
-                 // Fallback: use the original parsing hint
-                 if (item.isString) {
-                     shouldQuote = true;
-                 }
-             }
-
-             if (shouldQuote) {
-                 valStr = `"${item.value}"`;
-             }
-
-             actions.push(`params.getOutput().put("${item.fieldName}", ${valStr});`);
-          }
-      });
-
-      const actionStr = actions.join(' ');
-      
-      if (editingRule.action !== actionStr) {
-          setEditingRule(prev => prev ? ({ ...prev, action: actionStr }) : null);
-      }
-      
-  }, [actionItems, dataModels]); 
-
   if (!isOpen || !editingRule) return null;
-
-  const generateJavaCondition = (node: ConditionNode): string => {
-    if (!node) return 'true';
-    
-    if (node.type === 'LEAF' && node.condition) {
-        const c = node.condition;
-        const fieldName = c.field.split('.')[1]; // Model.Field -> Field
-        const safeStringClass = 'org.apache.commons.lang3.StringUtils';
-        
-        if (c.type === FieldType.STRING) {
-            const val = `"${c.value}"`;
-            const param = `params.getString("${fieldName}")`;
-            
-            switch (c.operator) {
-                case 'EQUALS': return `${safeStringClass}.equals(${param}, ${val})`;
-                case 'IS_BLANK': return `${safeStringClass}.isBlank(${param})`;
-                case 'IS_NOT_BLANK': return `${safeStringClass}.isNotBlank(${param})`;
-                case 'STARTS_WITH': return `${safeStringClass}.startsWith(${param}, ${val})`;
-                case 'ENDS_WITH': return `${safeStringClass}.endsWith(${param}, ${val})`;
-                default: return 'true';
-            }
-        } else if (c.type === FieldType.NUMBER) {
-            const val = c.value || '0';
-            const param = `params.getIntValue("${fieldName}")`;
-            
-            switch (c.operator) {
-                case 'EQUALS': return `${param} == ${val}`;
-                case 'GT': return `${param} > ${val}`;
-                case 'LT': return `${param} < ${val}`;
-                default: return 'true';
-            }
-        }
-        return 'true';
-    } 
-    
-    if (node.type === 'GROUP' && node.children && node.children.length > 0) {
-        const childConditions = node.children.map(generateJavaCondition);
-        const op = node.logicalOperator === 'OR' ? ' || ' : ' && ';
-        return `(${childConditions.join(op)})`;
-    }
-    
-    return 'true';
-  };
 
   const handleSave = () => {
       if (!editingRule) return;
-      const generatedCondition = generateJavaCondition(editingRule.conditionNode!);
-      // Ensure action string is up to date (logic duplicated from effect for safety, though effect should handle it)
-      const actions: string[] = [];
-      actionItems.forEach(item => {
-          if (item.fieldName && item.value !== '') {
-             const model = dataModels.find(m => m.name === item.modelName);
-             const field = model?.fields.find(f => f.name === item.fieldName);
-             let valStr = item.value;
-             let shouldQuote = false;
-             if (field) {
-                 if (field.type === FieldType.STRING || field.type === FieldType.ENUM) shouldQuote = true;
-             } else {
-                 if (item.isString) shouldQuote = true;
-             }
-             if (shouldQuote) valStr = `"${item.value}"`;
-             actions.push(`params.getOutput().put("${item.fieldName}", ${valStr});`);
-          }
-      });
+
+      // Construct RuleActions from the UI state
+      const finalActions: RuleAction[] = actionItems
+          .filter(item => item.fieldName && item.value !== '')
+          .map(item => ({
+              modelName: item.modelName,
+              fieldName: item.fieldName,
+              value: item.value,
+              valueType: item.valueType
+          }));
       
       const ruleToSave = { 
           ...editingRule, 
-          condition: generatedCondition,
-          action: actions.join(' ')
+          // We set these to placeholders/comments. The backend will regenerate the safe code from conditionNode and ruleActions.
+          condition: '/* Generated by Backend */',
+          action: '/* Generated by Backend */',
+          ruleActions: finalActions
       };
       onSave(ruleToSave);
   };
@@ -202,7 +118,7 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
   const outputModels = dataModels.filter(dm => dm.category === DataModelCategory.OUTPUT);
 
   const handleAddAction = () => {
-      setActionItems([...actionItems, { id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', isString: true }]);
+      setActionItems([...actionItems, { id: crypto.randomUUID(), modelName: '', fieldName: '', value: '', valueType: 'STRING' }]);
   };
 
   const handleRemoveAction = (id: string) => {
@@ -210,7 +126,22 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
   };
 
   const updateActionItem = (id: string, updates: Partial<ActionItem>) => {
-      setActionItems(actionItems.map(item => item.id === id ? { ...item, ...updates } : item));
+      setActionItems(prev => prev.map(item => {
+          if (item.id !== id) return item;
+          
+          const newItem = { ...item, ...updates };
+          
+          // If model/field changed, update valueType
+          if (updates.modelName || updates.fieldName) {
+              const model = dataModels.find(m => m.name === newItem.modelName);
+              const field = model?.fields.find(f => f.name === newItem.fieldName);
+              if (field) {
+                  newItem.valueType = field.type;
+              }
+          }
+          
+          return newItem;
+      }));
   };
 
   return (
@@ -285,7 +216,6 @@ export default function RuleModal({ isOpen, initialRule, dataModels, enabledInte
 
                                 <div className="w-1/4">
                                     {/* If model selected, show Field Dropdown. If not, show raw input (or disabled dropdown + text display?) */}
-                                    {/* To keep it simple and preserve data, if we can't find the model, we show the fieldName in a simple text input so user sees it exists */}
                                     {item.modelName ? (
                                         <select 
                                             value={item.fieldName} 

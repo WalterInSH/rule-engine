@@ -2,7 +2,6 @@ package com.demo.controller;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
-import com.demo.common.Rule;
 import com.demo.engine.RuleEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,11 +30,11 @@ public class RuleController {
     public List<ExecutionLogSummary> getExecutionLogs(
             @PathVariable String spaceId,
             @RequestParam(required = false) String date) {
-        
+
         if (date == null || date.isEmpty()) {
             date = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
         }
-        
+
         // Log path: execution_logs/{spaceId}/production/{date}
         File logDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + date);
         if (!logDir.exists() || !logDir.isDirectory()) {
@@ -52,10 +51,10 @@ public class RuleController {
             try {
                 String content = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
                 JSONObject json = JSONObject.parseObject(content);
-                
+
                 ExecutionLogSummary summary = new ExecutionLogSummary();
                 summary.setFileName(f.getName());
-                
+
                 if (json.containsKey("output") && json.get("output") instanceof JSONObject) {
                     JSONObject output = json.getJSONObject("output");
                     summary.setStartTime(output.getString("_startTime"));
@@ -64,14 +63,14 @@ public class RuleController {
                     summary.setStartTime(json.getString("_startTime"));
                     summary.setDurationMs(json.getLongValue("_durationMs"));
                 }
-                
+
                 if (json.containsKey("abTestId")) {
                     summary.setAbTestId(json.getString("abTestId"));
                 }
                 if (json.containsKey("abVariantId")) {
                     summary.setAbVariantId(json.getString("abVariantId"));
                 }
-                
+
                 String name = f.getName();
                 int lastUnderscore = name.lastIndexOf('_');
                 if (lastUnderscore > 0) {
@@ -85,14 +84,14 @@ public class RuleController {
                 log.error("Failed to read log file: " + f.getName(), e);
             }
         }
-        
+
         // Sort by startTime desc
         summaries.sort((a, b) -> {
             if (b.getStartTime() == null) return -1;
             if (a.getStartTime() == null) return 1;
             return b.getStartTime().compareTo(a.getStartTime());
         });
-        
+
         return summaries;
     }
 
@@ -138,35 +137,35 @@ public class RuleController {
 
     @PostMapping("/execute")
     public com.demo.engine.RuleExecutionResult execute(
-            @PathVariable String spaceId, 
+            @PathVariable String spaceId,
             @RequestBody JSONObject params,
             @RequestParam(required = false, defaultValue = "dev") String env) {
-        
+
         long start = System.currentTimeMillis();
         com.demo.engine.RuleExecutionResult result = ruleEngine.execute(spaceId, params, env);
         long duration = System.currentTimeMillis() - start;
-        
+
         Date now = new Date(start);
         String dateStr = new SimpleDateFormat("yyyy-MM-dd").format(now);
         String timeStr = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS").format(now);
-        
+
         if (result.getOutput() != null) {
             result.getOutput().put("_startTime", timeStr);
             result.getOutput().put("_durationMs", duration);
         }
-        
+
         // Log execution to file only if production
         if ("production".equalsIgnoreCase(env)) {
             try {
                 String version = result.getExecutedVersion() != null ? result.getExecutedVersion() : ruleEngine.getCurrentVersion(spaceId, env);
                 String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
                 String fileName = version + "_" + timestamp + ".json";
-                
+
                 File spaceDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + dateStr);
                 if (!spaceDir.exists()) {
                     spaceDir.mkdirs();
                 }
-                
+
                 File logFile = new File(spaceDir, fileName);
                 String jsonContent = JSONObject.toJSONString(result, SerializerFeature.PrettyFormat);
                 Files.write(logFile.toPath(), jsonContent.getBytes(StandardCharsets.UTF_8));
@@ -180,10 +179,10 @@ public class RuleController {
 
     @PostMapping("/reload")
     public String reload(
-            @PathVariable String spaceId, 
+            @PathVariable String spaceId,
             @RequestBody com.demo.common.RuleSet ruleSet,
             @RequestParam(required = false, defaultValue = "dev") String env) {
-        
+
         ruleEngine.loadRules(spaceId, ruleSet, env);
         return "Loaded " + (ruleSet.getRules() != null ? ruleSet.getRules().size() : 0) + " rules for space " + spaceId + " env " + env;
     }

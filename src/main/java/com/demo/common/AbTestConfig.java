@@ -1,6 +1,7 @@
 package com.demo.common;
 
 import lombok.Data;
+
 import java.util.List;
 
 @Data
@@ -9,7 +10,7 @@ public class AbTestConfig {
     private List<Variant> variants;
     private String expiration; // ISO DateTime
     private boolean active;
-    
+
     private String startedAt; // ISO DateTime
     private String endedAt;   // ISO DateTime
     private String createdBy; // Username or "system"
