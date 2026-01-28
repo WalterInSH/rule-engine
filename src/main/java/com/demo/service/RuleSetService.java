@@ -16,11 +16,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,19 +29,19 @@ public class RuleSetService {
     public RuleSetService(@Value("${app.storage.base-dir}") String baseDir) {
         this.BASE_DIR = baseDir;
     }
-    
+
     @PostConstruct
     public void init() {
         // Migration logic: Move legacy rulesets to default space
         Path legacyDir = Paths.get(BASE_DIR, "rulesets");
         Path defaultSpaceDir = Paths.get(BASE_DIR, "spaces", "default", "rulesets");
-        
+
         if (Files.exists(legacyDir) && Files.isDirectory(legacyDir)) {
             try {
                 if (!Files.exists(defaultSpaceDir)) {
                     Files.createDirectories(defaultSpaceDir);
                 }
-                
+
                 try (Stream<Path> paths = Files.list(legacyDir)) {
                     paths.filter(Files::isRegularFile)
                          .filter(p -> p.toString().endsWith(".json"))
@@ -71,7 +67,7 @@ public class RuleSetService {
     private Path getSnapshotPath(String spaceId, String ruleSetName) {
         return Paths.get(BASE_DIR, "spaces", spaceId, "snapshots", ruleSetName);
     }
-    
+
     private Path getProductionPath(String spaceId) {
         return Paths.get(BASE_DIR, "spaces", spaceId, "production");
     }
@@ -128,11 +124,11 @@ public class RuleSetService {
             if (!Files.exists(snapshotDir)) {
                 Files.createDirectories(snapshotDir);
             }
-            
+
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             String filename = timestamp + "_" + tag + ".json";
             Path snapshotPath = snapshotDir.resolve(filename);
-            
+
             Files.copy(currentPath, snapshotPath);
             log.info("Created snapshot {} for rule set {} in space {}", filename, ruleSetName, spaceId);
         } catch (IOException e) {
@@ -156,7 +152,7 @@ public class RuleSetService {
                      // Expected format: yyyyMMdd_HHmmss_tag.json
                      Map<String, String> info = new HashMap<>();
                      info.put("filename", filename);
-                     
+
                      String nameWithoutExt = filename.substring(0, filename.length() - 5);
                      String[] parts = nameWithoutExt.split("_", 3);
                      if (parts.length >= 3) {
@@ -171,7 +167,7 @@ public class RuleSetService {
         } catch (IOException e) {
             log.error("Failed to list snapshots for rule set: " + ruleSetName, e);
         }
-        
+
         versions.sort((a, b) -> b.get("filename").compareTo(a.get("filename")));
         return versions;
     }
@@ -181,7 +177,7 @@ public class RuleSetService {
         if (!Files.exists(snapshotPath)) {
             throw new RuntimeException("Snapshot not found: " + versionFilename);
         }
-        
+
         Path targetPath = getStoragePath(spaceId).resolve(ruleSetName + ".json");
         try {
             Files.copy(snapshotPath, targetPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -229,10 +225,10 @@ public class RuleSetService {
                 config.put("tag", tag);
             }
             config.put("deployedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-            
+
             Path configPath = prodDir.resolve("config.json");
             Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
-            
+
             log.info("Deployed snapshot {} (tag: {}) of {} to production in space {}", snapshotFilename, tag, ruleSetName, spaceId);
 
         } catch (IOException e) {
@@ -302,7 +298,7 @@ public class RuleSetService {
                 if (!Files.exists(snapshotPath)) {
                     throw new RuntimeException("Snapshot not found for variant " + variant.getName() + ": " + variant.getVersion());
                 }
-                
+
                 Path targetPath = abDir.resolve(variant.getId() + ".json");
                 Files.copy(snapshotPath, targetPath);
             }
@@ -313,7 +309,7 @@ public class RuleSetService {
             }
             Path configPath = abDir.resolve("config.json");
             Files.write(configPath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
-            
+
             log.info("Deployed A/B test plan to space {}", spaceId);
 
         } catch (IOException e) {
@@ -346,7 +342,7 @@ public class RuleSetService {
             String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
             String filename = "ab_" + timestamp + ".json";
             Path archivePath = historyDir.resolve(filename);
-            
+
             Files.write(archivePath, JSON.toJSONString(config, true).getBytes(StandardCharsets.UTF_8));
             log.info("Archived A/B test plan to {}", filename);
         } catch (IOException e) {
@@ -383,7 +379,7 @@ public class RuleSetService {
     public List<com.demo.common.AbTestConfig> getAbTestHistory(String spaceId) {
         Path historyDir = getAbHistoryPath(spaceId);
         if (!Files.exists(historyDir)) return Collections.emptyList();
-        
+
         List<com.demo.common.AbTestConfig> history = new ArrayList<>();
         try (Stream<Path> paths = Files.list(historyDir)) {
             paths.filter(Files::isRegularFile)

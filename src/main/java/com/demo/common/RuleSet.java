@@ -1,6 +1,7 @@
 package com.demo.common;
 
 import lombok.Data;
+
 import java.util.List;
 
 @Data

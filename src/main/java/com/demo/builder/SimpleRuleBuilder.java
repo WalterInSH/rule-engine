@@ -3,6 +3,7 @@ package com.demo.builder;
 import com.demo.common.Rule;
 import com.demo.engine.RunTimeRule;
 import com.google.common.collect.Sets;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -15,7 +16,7 @@ public class SimpleRuleBuilder {
         String className = "Rule_" + rule.getId() + "_" + env.replaceAll("[^a-zA-Z0-9_]", "_");
         JClass jClass = new JClass(className);
         jClass.setImplement(new String[]{RunTimeRule.class.getName()});
-        
+
         // Header
         Set<String> imports = Sets.newTreeSet();
         imports.add("com.demo.engine.RuleContext");
@@ -33,9 +34,9 @@ public class SimpleRuleBuilder {
         // isFired
         List<JMethodParam> params = Collections.singletonList(new JMethodParam("params", "RuleContext"));
         List<String> exceptions = Collections.singletonList("Exception");
-        
+
         jClass.addMethod(new JMethod("isFired", null, "boolean", "return " + RuleCodeGenerator.generateCondition(rule.getConditionNode()) + ";", params, exceptions));
-        
+
         // executeAction
         jClass.addMethod(new JMethod("executeAction", null, "void", RuleCodeGenerator.generateAction(rule.getRuleActions()), params, exceptions));
 
