@@ -26,6 +26,7 @@ public class RuleEngine {
     }
 
     private final Map<String, EnvContext> contexts = new ConcurrentHashMap<>();
+    private final Map<String, com.demo.common.AbTestConfig> abConfigs = new ConcurrentHashMap<>();
 
     private final com.demo.service.DataModelService dataModelService;
     private final List<com.demo.loader.DataLoader> dataLoaders;
@@ -33,6 +34,23 @@ public class RuleEngine {
     public RuleEngine(com.demo.service.DataModelService dataModelService, List<com.demo.loader.DataLoader> dataLoaders) {
         this.dataModelService = dataModelService;
         this.dataLoaders = dataLoaders;
+    }
+
+    public void loadAbTestConfig(String spaceId, com.demo.common.AbTestConfig config) {
+        abConfigs.put(spaceId, config);
+        // Load variant rules
+        if (config != null && config.getVariants() != null) {
+            // We expect the caller to have already loaded the rules for each variant into 
+            // "production:variantId" using loadRules().
+            // But if not, we can't do it here easily without the RuleSet objects.
+            // So the loader/controller must handle loading the rules for variants.
+        }
+    }
+
+    public void unloadAbTestConfig(String spaceId) {
+        abConfigs.remove(spaceId);
+        // We should also unload the variant rules to free memory? 
+        // For now, let's keep it simple. The loader can handle unloading if needed.
     }
 
     public String getCurrentVersion(String spaceId, String env) {
@@ -71,7 +89,7 @@ public class RuleEngine {
                 // 2. Compile
                 Class<? extends RunTimeRule> ruleClass = CompilerUtil.compile(
                         SimpleRuleBuilder.PACKAGE_NAME,
-                        "Rule_" + ruleDef.getId() + "_" + env, // Unique class name per env to avoid collisions if concurrent
+                        "Rule_" + ruleDef.getId() + "_" + env.replaceAll("[^a-zA-Z0-9_]", "_"), // Sanitize env for class name
                         javaSource
                 );
 
@@ -89,8 +107,63 @@ public class RuleEngine {
     }
 
     public RuleExecutionResult execute(String spaceId, JSONObject params, String env) {
-        String key = getContextKey(spaceId, env);
+        String targetEnv = env;
+        String activeAbTestId = null;
+        String selectedVariantId = null;
+        
+        // A/B Testing Logic for Production
+        if ("production".equals(env)) {
+            com.demo.common.AbTestConfig abConfig = abConfigs.get(spaceId);
+            if (abConfig != null && abConfig.isActive()) {
+                // Check expiration
+                boolean expired = false;
+                if (abConfig.getExpiration() != null) {
+                    try {
+                        java.time.LocalDateTime exp = java.time.LocalDateTime.parse(abConfig.getExpiration());
+                        if (java.time.LocalDateTime.now().isAfter(exp)) {
+                            expired = true;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to parse expiration date", e);
+                    }
+                }
+                
+                if (!expired) {
+                    activeAbTestId = abConfig.getId();
+                    // Random selection
+                    int random = java.util.concurrent.ThreadLocalRandom.current().nextInt(100);
+                    int currentWeight = 0;
+                    boolean variantSelected = false;
+                    for (com.demo.common.AbTestConfig.Variant v : abConfig.getVariants()) {
+                        currentWeight += v.getWeight();
+                        if (random < currentWeight) {
+                            targetEnv = "production:" + v.getId();
+                            selectedVariantId = v.getId();
+                            variantSelected = true;
+                            break;
+                        }
+                    }
+                    if (!variantSelected) {
+                        selectedVariantId = "main";
+                    }
+                }
+            }
+        }
+
+        String key = getContextKey(spaceId, targetEnv);
         EnvContext ctx = contexts.get(key);
+        
+        // Fallback to main production if variant context is missing
+        if (ctx == null && !targetEnv.equals(env)) {
+            log.warn("Variant context {} not found, falling back to {}", targetEnv, env);
+            key = getContextKey(spaceId, env);
+            ctx = contexts.get(key);
+            // If fallback happens, should we still report it as variant execution? 
+            // Probably not safe to report variant ID if we ran main rules.
+            // But we are in an A/B test.
+            // Let's keep abTestId but maybe clear variantId or set it to "fallback-main"
+            selectedVariantId = "main"; 
+        }
 
         if (ctx == null) {
             log.warn("No rules loaded for space {} env {}", spaceId, env);
@@ -148,6 +221,9 @@ public class RuleEngine {
         result.setInput(input);
         result.setInternalModels(internalModels);
         result.setOutput(context.getOutput());
+        result.setExecutedVersion(ctx.getVersion());
+        result.setAbTestId(activeAbTestId);
+        result.setAbVariantId(selectedVariantId);
         return result;
     }
 }

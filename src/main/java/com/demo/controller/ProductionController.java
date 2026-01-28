@@ -55,4 +55,83 @@ public class ProductionController {
         }
         return ResponseEntity.ok(config);
     }
+
+    @PostMapping("/ab-test")
+    public ResponseEntity<?> createAbTest(@PathVariable String spaceId, @RequestBody com.demo.common.AbTestConfig config) {
+        try {
+            // Validate
+            if (config.getVariants() == null || config.getVariants().isEmpty()) {
+                return ResponseEntity.badRequest().body("Variants are required");
+            }
+            // Check weights
+            int sum = config.getVariants().stream().mapToInt(v -> v.getWeight()).sum();
+            if (sum >= 100) {
+                 return ResponseEntity.badRequest().body("Sum of variant weights must be less than 100 (rest for main)");
+            }
+            if (config.getVariants().size() > 2) {
+                 return ResponseEntity.badRequest().body("Max 2 additional variants allowed");
+            }
+
+            // Assign IDs if missing
+            if (config.getId() == null) {
+                config.setId(java.util.UUID.randomUUID().toString());
+            }
+            for (com.demo.common.AbTestConfig.Variant v : config.getVariants()) {
+                if (v.getId() == null) v.setId(java.util.UUID.randomUUID().toString());
+            }
+            config.setActive(true);
+
+            // Deploy to disk
+            ruleSetService.deployAbTestPlan(spaceId, config);
+
+            // Load to Engine
+            for (com.demo.common.AbTestConfig.Variant variant : config.getVariants()) {
+                RuleSet variantRs = ruleSetService.readVariantRuleSet(spaceId, variant.getId());
+                if (variantRs != null) {
+                    variantRs.setVersion(variant.getTag() != null ? variant.getTag() : variant.getVersion());
+                    ruleEngine.loadRules(spaceId, variantRs, "production:" + variant.getId());
+                }
+            }
+            ruleEngine.loadAbTestConfig(spaceId, config);
+
+            return ResponseEntity.ok("A/B Test Plan Deployed");
+        } catch (Exception e) {
+            log.error("Failed to deploy A/B test", e);
+            return ResponseEntity.internalServerError().body("Failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/ab-test")
+    public ResponseEntity<?> getAbTest(@PathVariable String spaceId) {
+        com.demo.common.AbTestConfig config = ruleSetService.getAbTestConfig(spaceId);
+        if (config == null) {
+             return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(config);
+    }
+
+    @GetMapping("/ab-test/history")
+    public ResponseEntity<?> getAbTestHistory(@PathVariable String spaceId) {
+        return ResponseEntity.ok(ruleSetService.getAbTestHistory(spaceId));
+    }
+
+    @DeleteMapping("/ab-test")
+    public ResponseEntity<?> deleteAbTest(@PathVariable String spaceId) {
+        try {
+            com.demo.common.AbTestConfig oldConfig = ruleSetService.getAbTestConfig(spaceId);
+            ruleSetService.deleteAbTestPlan(spaceId);
+            ruleEngine.unloadAbTestConfig(spaceId);
+            
+            // Unload variants from engine
+            if (oldConfig != null && oldConfig.getVariants() != null) {
+                for (com.demo.common.AbTestConfig.Variant v : oldConfig.getVariants()) {
+                    ruleEngine.loadRules(spaceId, null, "production:" + v.getId());
+                }
+            }
+            return ResponseEntity.ok("A/B Test Plan Stopped");
+        } catch (Exception e) {
+             log.error("Failed to stop A/B test", e);
+             return ResponseEntity.internalServerError().body("Failed: " + e.getMessage());
+        }
+    }
 }

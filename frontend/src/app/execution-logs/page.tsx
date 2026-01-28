@@ -12,6 +12,8 @@ interface ExecutionLog {
     version: string;
     startTime: string;
     durationMs: number;
+    abTestId?: string;
+    abVariantId?: string;
 }
 
 export default function ExecutionLogsPage() {
@@ -108,6 +110,7 @@ export default function ExecutionLogsPage() {
                                         <th className="px-6 py-4">Start Time</th>
                                         <th className="px-6 py-4">Duration</th>
                                         <th className="px-6 py-4">Rule Set Version</th>
+                                        <th className="px-6 py-4">Experiment</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -150,6 +153,20 @@ export default function ExecutionLogsPage() {
                                                     <Hash size={12} />
                                                     {displayVersion}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {log.abTestId && (
+                                                    <div className="flex flex-col gap-1 items-start">
+                                                        <span className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 px-1.5 py-0.5 rounded font-mono border border-purple-200 dark:border-purple-800">
+                                                            ID: {log.abTestId.substring(0, 8)}...
+                                                        </span>
+                                                        {log.abVariantId && (
+                                                            <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                                                Variant: <span className="font-semibold">{log.abVariantId}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                         </motion.tr>
                                     )})}

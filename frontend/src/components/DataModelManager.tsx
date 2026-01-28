@@ -16,6 +16,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
   const [selectedModel, setSelectedModel] = useState<DataModel | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState<string>('');
 
   const fetchDataModels = useCallback(async () => {
     try {
@@ -65,11 +66,13 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
       source: '',
       fields: []
     });
+    setEditingId('new');
     setIsEditing(true);
   };
 
   const handleEditModel = (model: DataModel) => {
     setSelectedModel({ ...model });
+    setEditingId(model.name);
     setIsEditing(true);
   };
 
@@ -225,7 +228,7 @@ export default function DataModelManager({ category }: DataModelManagerProps) {
             <motion.div 
                initial={{ opacity: 0, x: 20 }}
                animate={{ opacity: 1, x: 0 }}
-               key={selectedModel.name || 'new'}
+               key={editingId}
             >
               <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">

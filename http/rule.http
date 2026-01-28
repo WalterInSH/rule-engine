@@ -3,5 +3,5 @@ POST http://localhost:8085/api/spaces/default/rules/execute?env=production
 Content-Type: application/json
 
 {
-  "stringField":"123"
+  "userId":"123"
 }
