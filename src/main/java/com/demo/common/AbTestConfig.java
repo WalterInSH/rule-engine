@@ -5,6 +5,7 @@ import java.util.List;
 
 @Data
 public class AbTestConfig {
+    private String id;
     private List<Variant> variants;
     private String expiration; // ISO DateTime
     private boolean active;

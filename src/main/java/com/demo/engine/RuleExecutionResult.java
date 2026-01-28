@@ -9,6 +9,9 @@ public class RuleExecutionResult {
     private JSONObject input;
     private List<InternalModelEntry> internalModels;
     private JSONObject output;
+    private String executedVersion;
+    private String abTestId;
+    private String abVariantId;
 
     @Data
     public static class InternalModelEntry {

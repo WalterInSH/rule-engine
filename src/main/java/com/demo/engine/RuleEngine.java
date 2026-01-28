@@ -108,6 +108,8 @@ public class RuleEngine {
 
     public RuleExecutionResult execute(String spaceId, JSONObject params, String env) {
         String targetEnv = env;
+        String activeAbTestId = null;
+        String selectedVariantId = null;
         
         // A/B Testing Logic for Production
         if ("production".equals(env)) {
@@ -127,15 +129,22 @@ public class RuleEngine {
                 }
                 
                 if (!expired) {
+                    activeAbTestId = abConfig.getId();
                     // Random selection
                     int random = java.util.concurrent.ThreadLocalRandom.current().nextInt(100);
                     int currentWeight = 0;
+                    boolean variantSelected = false;
                     for (com.demo.common.AbTestConfig.Variant v : abConfig.getVariants()) {
                         currentWeight += v.getWeight();
                         if (random < currentWeight) {
                             targetEnv = "production:" + v.getId();
+                            selectedVariantId = v.getId();
+                            variantSelected = true;
                             break;
                         }
+                    }
+                    if (!variantSelected) {
+                        selectedVariantId = "main";
                     }
                 }
             }
@@ -149,6 +158,11 @@ public class RuleEngine {
             log.warn("Variant context {} not found, falling back to {}", targetEnv, env);
             key = getContextKey(spaceId, env);
             ctx = contexts.get(key);
+            // If fallback happens, should we still report it as variant execution? 
+            // Probably not safe to report variant ID if we ran main rules.
+            // But we are in an A/B test.
+            // Let's keep abTestId but maybe clear variantId or set it to "fallback-main"
+            selectedVariantId = "main"; 
         }
 
         if (ctx == null) {
@@ -207,7 +221,9 @@ public class RuleEngine {
         result.setInput(input);
         result.setInternalModels(internalModels);
         result.setOutput(context.getOutput());
-        // TODO: Pass version info to result if needed
+        result.setExecutedVersion(ctx.getVersion());
+        result.setAbTestId(activeAbTestId);
+        result.setAbVariantId(selectedVariantId);
         return result;
     }
 }

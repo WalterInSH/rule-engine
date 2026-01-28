@@ -73,6 +73,9 @@ public class ProductionController {
             }
 
             // Assign IDs if missing
+            if (config.getId() == null) {
+                config.setId(java.util.UUID.randomUUID().toString());
+            }
             for (com.demo.common.AbTestConfig.Variant v : config.getVariants()) {
                 if (v.getId() == null) v.setId(java.util.UUID.randomUUID().toString());
             }

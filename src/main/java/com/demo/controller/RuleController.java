@@ -65,6 +65,13 @@ public class RuleController {
                     summary.setDurationMs(json.getLongValue("_durationMs"));
                 }
                 
+                if (json.containsKey("abTestId")) {
+                    summary.setAbTestId(json.getString("abTestId"));
+                }
+                if (json.containsKey("abVariantId")) {
+                    summary.setAbVariantId(json.getString("abVariantId"));
+                }
+                
                 String name = f.getName();
                 int lastUnderscore = name.lastIndexOf('_');
                 if (lastUnderscore > 0) {
@@ -125,6 +132,8 @@ public class RuleController {
         private String version;
         private String startTime;
         private long durationMs;
+        private String abTestId;
+        private String abVariantId;
     }
 
     @PostMapping("/execute")
@@ -149,7 +158,7 @@ public class RuleController {
         // Log execution to file only if production
         if ("production".equalsIgnoreCase(env)) {
             try {
-                String version = ruleEngine.getCurrentVersion(spaceId, env);
+                String version = result.getExecutedVersion() != null ? result.getExecutedVersion() : ruleEngine.getCurrentVersion(spaceId, env);
                 String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
                 String fileName = version + "_" + timestamp + ".json";
                 
