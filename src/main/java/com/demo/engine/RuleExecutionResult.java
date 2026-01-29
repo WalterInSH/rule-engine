@@ -11,6 +11,7 @@ public class RuleExecutionResult {
     private List<InternalModelEntry> internalModels;
     private JSONObject output;
     private String executedVersion;
+    private String executionId;
     private String abTestId;
     private String abVariantId;
 

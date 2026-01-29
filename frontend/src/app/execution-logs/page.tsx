@@ -10,6 +10,7 @@ import LogDetailModal from '@/components/rules/LogDetailModal';
 interface ExecutionLog {
     fileName: string;
     version: string;
+    executionId?: string;
     startTime: string;
     durationMs: number;
     abTestId?: string;
@@ -108,6 +109,7 @@ export default function ExecutionLogsPage() {
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wider text-slate-500 font-semibold">
                                         <th className="px-6 py-4">Start Time</th>
+                                        <th className="px-6 py-4">ID</th>
                                         <th className="px-6 py-4">Duration</th>
                                         <th className="px-6 py-4">Rule Set Version</th>
                                         <th className="px-6 py-4">Experiment</th>
@@ -141,6 +143,11 @@ export default function ExecutionLogsPage() {
                                                     <Clock size={16} className="text-slate-400" />
                                                     {log.startTime}
                                                 </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-[10px] text-slate-400 font-mono select-all block max-w-[100px] truncate cursor-text" title={log.executionId}>
+                                                    {log.executionId || '-'}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 text-slate-700 dark:text-slate-300 font-mono text-sm">
                                                 <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ package com.demo.controller;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.demo.engine.RuleEngine;
+import com.demo.engine.RuleExecutionResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,13 +71,20 @@ public class RuleController {
                 if (json.containsKey("abVariantId")) {
                     summary.setAbVariantId(json.getString("abVariantId"));
                 }
+                if (json.containsKey("executionId")) {
+                    summary.setExecutionId(json.getString("executionId"));
+                }
 
                 String name = f.getName();
-                int lastUnderscore = name.lastIndexOf('_');
-                if (lastUnderscore > 0) {
-                     summary.setVersion(name.substring(0, lastUnderscore));
+                if (json.containsKey("executedVersion")) {
+                    summary.setVersion(json.getString("executedVersion"));
                 } else {
-                     summary.setVersion("unknown");
+                    int lastUnderscore = name.lastIndexOf('_');
+                    if (lastUnderscore > 0) {
+                        summary.setVersion(name.substring(0, lastUnderscore));
+                    } else {
+                        summary.setVersion("unknown");
+                    }
                 }
 
                 summaries.add(summary);
@@ -129,6 +137,7 @@ public class RuleController {
     public static class ExecutionLogSummary {
         private String fileName;
         private String version;
+        private String executionId;
         private String startTime;
         private long durationMs;
         private String abTestId;
@@ -136,14 +145,18 @@ public class RuleController {
     }
 
     @PostMapping("/execute")
-    public com.demo.engine.RuleExecutionResult execute(
+    public RuleExecutionResult execute(
             @PathVariable String spaceId,
             @RequestBody JSONObject params,
             @RequestParam(required = false, defaultValue = "dev") String env) {
 
         long start = System.currentTimeMillis();
-        com.demo.engine.RuleExecutionResult result = ruleEngine.execute(spaceId, params, env);
+        RuleExecutionResult result = ruleEngine.execute(spaceId, params, env);
         long duration = System.currentTimeMillis() - start;
+
+        // Generate Execution ID
+        String executionId = java.util.UUID.randomUUID().toString();
+        result.setExecutionId(executionId);
 
         Date now = new Date(start);
         String dateStr = new SimpleDateFormat("yyyy-MM-dd").format(now);
@@ -159,7 +172,7 @@ public class RuleController {
             try {
                 String version = result.getExecutedVersion() != null ? result.getExecutedVersion() : ruleEngine.getCurrentVersion(spaceId, env);
                 String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
-                String fileName = version + "_" + timestamp + ".json";
+                String fileName = version + "_" + timestamp + "_" + executionId + ".json";
 
                 File spaceDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + dateStr);
                 if (!spaceDir.exists()) {
