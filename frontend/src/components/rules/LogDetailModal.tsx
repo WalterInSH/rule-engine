@@ -11,6 +11,7 @@ interface RuleExecutionResult {
     internalModels?: InternalModelEntry[];
     loadedModels?: InternalModelEntry[];
     output: Record<string, unknown>;
+    executionId?: string;
 }
 
 interface LogDetailModalProps {
@@ -43,6 +44,12 @@ export default function LogDetailModal({ isOpen, onClose, data, fileName }: LogD
                         </h2>
                     </div>
                     <div className="flex items-center gap-4">
+                        {data.executionId && (
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
+                                <span className="text-slate-400 select-none">ID:</span>
+                                <span className="select-all">{data.executionId}</span>
+                            </div>
+                        )}
                         {startTime && (
                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                                 <Clock size={14} />
