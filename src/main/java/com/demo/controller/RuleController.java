@@ -1,7 +1,6 @@
 package com.demo.controller;
 
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.demo.engine.RuleEngine;
 import com.demo.engine.RuleExecutionResult;
 import lombok.RequiredArgsConstructor;
@@ -9,9 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -23,126 +19,39 @@ import java.util.List;
 public class RuleController {
 
     private final RuleEngine ruleEngine;
+    private final com.demo.service.log.ExecutionLogManager logManager;
 
     @Value("${app.storage.base-dir}")
     private String baseDir;
 
     @GetMapping("/logs")
-    public List<ExecutionLogSummary> getExecutionLogs(
+    public List<com.demo.model.log.ExecutionLogSummary> getExecutionLogs(
             @PathVariable String spaceId,
-            @RequestParam(required = false) String date) {
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String storage) {
 
         if (date == null || date.isEmpty()) {
             date = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
         }
 
-        // Log path: execution_logs/{spaceId}/production/{date}
-        File logDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + date);
-        if (!logDir.exists() || !logDir.isDirectory()) {
-            return java.util.Collections.emptyList();
-        }
-
-        File[] files = logDir.listFiles((dir, name) -> name.endsWith(".json"));
-        if (files == null) {
-            return java.util.Collections.emptyList();
-        }
-
-        List<ExecutionLogSummary> summaries = new java.util.ArrayList<>();
-        for (File f : files) {
-            try {
-                String content = new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8);
-                JSONObject json = JSONObject.parseObject(content);
-
-                ExecutionLogSummary summary = new ExecutionLogSummary();
-                summary.setFileName(f.getName());
-
-                if (json.containsKey("output") && json.get("output") instanceof JSONObject) {
-                    JSONObject output = json.getJSONObject("output");
-                    summary.setStartTime(output.getString("_startTime"));
-                    summary.setDurationMs(output.getLongValue("_durationMs"));
-                } else {
-                    summary.setStartTime(json.getString("_startTime"));
-                    summary.setDurationMs(json.getLongValue("_durationMs"));
-                }
-
-                if (json.containsKey("abTestId")) {
-                    summary.setAbTestId(json.getString("abTestId"));
-                }
-                if (json.containsKey("abVariantId")) {
-                    summary.setAbVariantId(json.getString("abVariantId"));
-                }
-                if (json.containsKey("executionId")) {
-                    summary.setExecutionId(json.getString("executionId"));
-                }
-
-                String name = f.getName();
-                if (json.containsKey("executedVersion")) {
-                    summary.setVersion(json.getString("executedVersion"));
-                } else {
-                    int lastUnderscore = name.lastIndexOf('_');
-                    if (lastUnderscore > 0) {
-                        summary.setVersion(name.substring(0, lastUnderscore));
-                    } else {
-                        summary.setVersion("unknown");
-                    }
-                }
-
-                summaries.add(summary);
-            } catch (Exception e) {
-                log.error("Failed to read log file: " + f.getName(), e);
-            }
-        }
-
-        // Sort by startTime desc
-        summaries.sort((a, b) -> {
-            if (b.getStartTime() == null) return -1;
-            if (a.getStartTime() == null) return 1;
-            return b.getStartTime().compareTo(a.getStartTime());
-        });
-
-        return summaries;
+        return logManager.fetchLogs(spaceId, date, storage);
     }
 
     @GetMapping("/logs/{fileName}")
     public Object getExecutionLogDetail(
             @PathVariable String spaceId,
             @PathVariable String fileName,
-            @RequestParam(required = false) String date) {
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) String storage) {
 
         if (date == null || date.isEmpty()) {
             date = new SimpleDateFormat("yyyy-MM-dd").format(new Date());
         }
 
-        // Validate fileName to prevent directory traversal
-        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
-            throw new IllegalArgumentException("Invalid filename");
-        }
-
-        File logFile = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + date + File.separator + fileName);
-
-        if (!logFile.exists()) {
-            return null;
-        }
-
-        try {
-            String content = new String(Files.readAllBytes(logFile.toPath()), StandardCharsets.UTF_8);
-            return JSONObject.parse(content);
-        } catch (Exception e) {
-            log.error("Failed to read log file: " + fileName, e);
-            throw new RuntimeException("Failed to read log");
-        }
+        return logManager.fetchLogDetail(spaceId, date, fileName, storage);
     }
 
-    @lombok.Data
-    public static class ExecutionLogSummary {
-        private String fileName;
-        private String version;
-        private String executionId;
-        private String startTime;
-        private long durationMs;
-        private String abTestId;
-        private String abVariantId;
-    }
+    // Removed internal ExecutionLogSummary class as it is now in model package
 
     @PostMapping("/execute")
     public RuleExecutionResult execute(
@@ -167,24 +76,9 @@ public class RuleController {
             result.getOutput().put("_durationMs", duration);
         }
 
-        // Log execution to file only if production
+        // Log execution
         if ("production".equalsIgnoreCase(env)) {
-            try {
-                String version = result.getExecutedVersion() != null ? result.getExecutedVersion() : ruleEngine.getCurrentVersion(spaceId, env);
-                String timestamp = new SimpleDateFormat("HHmmssSSS").format(now);
-                String fileName = version + "_" + timestamp + "_" + executionId + ".json";
-
-                File spaceDir = new File(baseDir + File.separator + "execution_logs" + File.separator + spaceId + File.separator + "production" + File.separator + dateStr);
-                if (!spaceDir.exists()) {
-                    spaceDir.mkdirs();
-                }
-
-                File logFile = new File(spaceDir, fileName);
-                String jsonContent = JSONObject.toJSONString(result, SerializerFeature.PrettyFormat);
-                Files.write(logFile.toPath(), jsonContent.getBytes(StandardCharsets.UTF_8));
-            } catch (Exception e) {
-                log.error("Failed to write execution log for space {} env {}", spaceId, env, e);
-            }
+            logManager.log(spaceId, env, result);
         }
 
         return result;

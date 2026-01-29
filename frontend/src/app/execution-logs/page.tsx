@@ -20,6 +20,7 @@ interface ExecutionLog {
 export default function ExecutionLogsPage() {
     const [logs, setLogs] = useState<ExecutionLog[]>([]);
     const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+    const [selectedStorage, setSelectedStorage] = useState<string>('');
     const [isLoading, setIsLoading] = useState(false);
     const [selectedLog, setSelectedLog] = useState<string | null>(null); // For future detail view
     const [logDetailData, setLogDetailData] = useState<any | null>(null);
@@ -29,13 +30,19 @@ export default function ExecutionLogsPage() {
         const handleSpaceChange = () => fetchLogs();
         window.addEventListener('spaceChanged', handleSpaceChange);
         return () => window.removeEventListener('spaceChanged', handleSpaceChange);
-    }, [selectedDate]);
+    }, [selectedDate, selectedStorage]);
 
     const fetchLogs = async () => {
         setIsLoading(true);
         try {
-            // endpoint: /api/spaces/{spaceId}/rules/logs?date=...
-            const res = await fetch(`${getSpaceApiUrl('rules')}/logs?date=${selectedDate}`);
+            // endpoint: /api/spaces/{spaceId}/rules/logs?date=...&storage=...
+            const url = new URL(`${getSpaceApiUrl('rules')}/logs`);
+            url.searchParams.append('date', selectedDate);
+            if (selectedStorage) {
+                url.searchParams.append('storage', selectedStorage);
+            }
+            
+            const res = await fetch(url.toString());
             if (res.ok) {
                 const data = await res.json();
                 setLogs(data);
@@ -53,7 +60,13 @@ export default function ExecutionLogsPage() {
     const handleLogClick = async (fileName: string) => {
         setSelectedLog(fileName);
         try {
-            const res = await fetch(`${getSpaceApiUrl('rules')}/logs/${fileName}?date=${selectedDate}`);
+            const url = new URL(`${getSpaceApiUrl('rules')}/logs/${fileName}`);
+            url.searchParams.append('date', selectedDate);
+            if (selectedStorage) {
+                url.searchParams.append('storage', selectedStorage);
+            }
+
+            const res = await fetch(url.toString());
             if (res.ok) {
                 const data = await res.json();
                 setLogDetailData(data);
@@ -81,14 +94,29 @@ export default function ExecutionLogsPage() {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <CalendarIcon className="text-slate-400" size={20} />
-                    <input
-                        type="date"
-                        value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
-                        className="bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-200 font-mono"
-                    />
+                <div className="flex items-center gap-4">
+                     <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <select
+                            value={selectedStorage}
+                            onChange={(e) => setSelectedStorage(e.target.value)}
+                            className="bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-200 text-sm font-medium"
+                        >
+                            <option value="">Default (Auto)</option>
+                            <option value="local">Local File System</option>
+                            <option value="s3">S3 / MinIO</option>
+                            <option value="elasticsearch">Elasticsearch</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <CalendarIcon className="text-slate-400" size={20} />
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="bg-transparent border-none focus:ring-0 text-slate-700 dark:text-slate-200 font-mono"
+                        />
+                    </div>
                 </div>
             </div>
 
